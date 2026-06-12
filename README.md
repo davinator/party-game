@@ -11,7 +11,17 @@ No waiting, no spectating, just chaos.
 
 ---
 
-## Quick start
+## Play online
+
+The client is hosted on GitHub Pages. To play with friends:
+
+1. Deploy the relay server (see below) and note its public URL.
+2. Open the GitHub Pages URL in multiple browsers.
+3. Enter the server address, pick a room code, and go.
+
+---
+
+## Run locally
 
 ### 1. Start the relay server
 
@@ -24,19 +34,58 @@ npm start
 
 ### 2. Open the client
 
-Serve the `client/` folder with any static file server:
-
 ```bash
 # Python 3
-cd client && python3 -m http.server 3000
+cd docs && python3 -m http.server 3000
 
-# Node (npx)
-cd client && npx serve .
+# Node
+cd docs && npx serve .
 ```
 
-Then open `http://localhost:3000` in multiple browser tabs (or on different machines on the same network pointing to the host's IP).
+Open `http://localhost:3000` in multiple tabs (or across machines on the same network).
 
-### 3. Play
+---
+
+## Deploy the relay server
+
+The server is a ~120-line Node.js WebSocket relay with no database or state beyond
+in-memory rooms. Any platform that runs Node works.
+
+**Railway**
+```bash
+# From repo root
+railway up --service server
+```
+
+**Fly.io**
+```bash
+cd server
+fly launch   # follow prompts, set PORT env var
+fly deploy
+```
+
+**Self-hosted / VPS**
+```bash
+cd server && npm install
+PORT=8080 node server.js
+# expose port 8080, then use ws://<your-ip>:8080 in the client
+```
+
+After deploying, players enter `your-domain.com:PORT` (or `wss://` if behind TLS)
+in the **Server address** field on the join screen.
+
+---
+
+## GitHub Pages setup
+
+1. Push this repo to GitHub.
+2. Go to **Settings → Pages**.
+3. Set source to **Deploy from a branch**, branch `main`, folder `/docs`.
+4. The game will be live at `https://<you>.github.io/<repo>/`.
+
+---
+
+## How to play
 
 1. Enter a name, room code, and pick a team.
 2. Everyone joins the same room code — first joiner is **host**.
@@ -54,7 +103,7 @@ Then open `http://localhost:3000` in multiple browser tabs (or on different mach
 |---|---|
 | Move | `A / D` or `←/→` |
 | Jump | `Space / W / ↑` |
-| Ghost fly (when dead) | `WASD` or arrow keys |
+| Ghost fly (when dead/build) | `WASD` or arrow keys |
 | Open placement | `E` |
 | Switch object type | `1` Platform · `2` Spike · `3` Spring |
 | Cancel placement | `Esc` |
@@ -75,7 +124,7 @@ server/server.js   Pure WebSocket relay — no game logic.
                    Rooms auto-created, first joiner = host.
                    Host sends full state snapshot to late joiners.
 
-client/js/game.js  Entire game engine — physics, rendering, net sync.
+docs/js/game.js    Entire game engine — physics, rendering, net sync.
                    Client-authoritative for the local player.
                    Remote players smoothly interpolate to broadcasted positions.
 ```
