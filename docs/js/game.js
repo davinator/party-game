@@ -634,7 +634,8 @@ class Game {
     this.vh  = window.innerHeight;
     this.cam = { x:0, y:0 };
 
-    this._lastTick  = 0;
+    this._lastTick    = 0;
+    this._acc         = 0;
     this._loopStarted = false;
 
     this._resize();
@@ -843,8 +844,9 @@ class Game {
 
   _spawnPlayers() {
     const sp=this.level.startPos();
-    const pArr=Object.values(this.players);
-    pArr.forEach((p,i)=>p.spawn(sp.x+i*36, sp.y));
+    // Sort by ID so every client assigns the same spawn slot to the same player
+    const pArr=Object.values(this.players).sort((a,b)=>a.id<b.id?-1:1);
+    pArr.forEach((p,i)=>p.spawn(sp.x+i*(PW+20), sp.y));
     // Point camera immediately at local player (no lerp lag on spawn)
     const lp=this.localPlayer;
     if (lp) {
@@ -874,8 +876,14 @@ class Game {
   }
 
   _tick(dt) {
-    const ticks=Math.max(1, Math.round(dt/(1000/60)));
-    for (let i=0;i<ticks;i++) this._step();
+    const STEP = 1000/60;
+    this._acc += dt;
+    // cap accumulator to avoid spiral-of-death after tab suspend
+    if (this._acc > 200) this._acc = STEP;
+    while (this._acc >= STEP) {
+      this._acc -= STEP;
+      this._step();
+    }
   }
 
   _step() {
