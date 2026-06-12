@@ -120,6 +120,7 @@ class GO {
     this.id        = d.id || uid();
     this.type      = d.type;
     this.x = d.x; this.y = d.y; this.w = d.w; this.h = d.h;
+    this.rotation  = d.rotation || 0; // 0 | 90 | 180 | 270  (AABB w/h swapped at 90/270)
     this.permanent = !!d.permanent;
     this.placedBy  = d.placedBy || null;
     this.team      = d.team || null;
@@ -131,66 +132,84 @@ class GO {
 
   toJSON() {
     return { id:this.id, type:this.type, x:this.x, y:this.y, w:this.w, h:this.h,
-             permanent:this.permanent, placedBy:this.placedBy, team:this.team };
+             rotation:this.rotation, permanent:this.permanent,
+             placedBy:this.placedBy, team:this.team };
   }
+
+  // Visual dimensions — inverse of the AABB swap applied at creation for 90°/270°
+  get vw() { return (this.rotation===90||this.rotation===270) ? this.h : this.w; }
+  get vh() { return (this.rotation===90||this.rotation===270) ? this.w : this.h; }
 
   draw(ctx) {
-    switch(this.type) {
-      case 'platform':   this._dPlat(ctx);  break;
-      case 'spike':      this._dSpike(ctx); break;
-      case 'spring':     this._dSpring(ctx);break;
-      case 'start_zone': this._dZone(ctx,'#2ecc71','START');  break;
-      case 'end_zone':   this._dZone(ctx,'#f1c40f','FINISH'); break;
+    const rot = this.rotation;
+    if (!rot) {
+      this._drawAt(ctx, this.x, this.y, this.w, this.h);
+    } else {
+      ctx.save();
+      ctx.translate(this.x + this.w/2, this.y + this.h/2);
+      ctx.rotate(rot * Math.PI / 180);
+      this._drawAt(ctx, -this.vw/2, -this.vh/2, this.vw, this.vh);
+      ctx.restore();
     }
   }
 
-  _dPlat(ctx) {
+  _drawAt(ctx, x, y, w, h) {
+    switch(this.type) {
+      case 'platform':   this._dPlat(ctx,x,y,w,h);  break;
+      case 'spike':      this._dSpike(ctx,x,y,w,h); break;
+      case 'spring':     this._dSpring(ctx,x,y,w,h);break;
+      case 'start_zone': this._dZone(ctx,x,y,w,h,'#2ecc71','START');  break;
+      case 'end_zone':   this._dZone(ctx,x,y,w,h,'#f1c40f','FINISH'); break;
+    }
+  }
+
+  _dPlat(ctx, x, y, w, h) {
     const tc = this.team ? TEAM[this.team] : null;
     ctx.fillStyle = tc ? tc.primary : '#555';
-    ctx.fillRect(this.x, this.y+5, this.w, this.h-5);
+    ctx.fillRect(x, y+5, w, h-5);
     ctx.fillStyle = tc ? tc.light : '#7f8c8d';
-    ctx.fillRect(this.x, this.y, this.w, 6);
+    ctx.fillRect(x, y, w, 6);
     if (this.permanent) {
       ctx.strokeStyle='rgba(255,255,255,0.18)'; ctx.lineWidth=1;
-      ctx.strokeRect(this.x+.5, this.y+.5, this.w-1, this.h-1);
+      ctx.strokeRect(x+.5, y+.5, w-1, h-1);
     }
   }
 
-  _dSpike(ctx) {
+  _dSpike(ctx, x, y, w, h) {
     const tc = this.team ? TEAM[this.team] : null;
     ctx.fillStyle='#444';
-    ctx.fillRect(this.x, this.y+this.h-5, this.w, 5);
+    ctx.fillRect(x, y+h-5, w, 5);
     ctx.fillStyle = tc ? tc.light : '#bdc3c7';
-    const n = Math.floor(this.w/16);
+    const n = Math.floor(w/16);
     for (let i=0;i<n;i++) {
-      const sx = this.x+i*16+8;
+      const sx = x+i*16+8;
       ctx.beginPath();
-      ctx.moveTo(sx-6, this.y+this.h-5);
-      ctx.lineTo(sx,   this.y);
-      ctx.lineTo(sx+6, this.y+this.h-5);
+      ctx.moveTo(sx-6, y+h-5);
+      ctx.lineTo(sx,   y);
+      ctx.lineTo(sx+6, y+h-5);
       ctx.fill();
     }
   }
 
-  _dSpring(ctx) {
+  _dSpring(ctx, x, y, w, h) {
     const tc = this.team ? TEAM[this.team] : null;
-    ctx.fillStyle='#444'; ctx.fillRect(this.x, this.y+this.h-5, this.w, 5);
+    ctx.fillStyle='#444'; ctx.fillRect(x, y+h-5, w, 5);
     ctx.fillStyle = tc ? tc.primary : '#e67e22';
-    ctx.fillRect(this.x+4, this.y+4, this.w-8, this.h-9);
-    ctx.fillStyle='#f39c12'; ctx.fillRect(this.x+4, this.y, this.w-8, 5);
+    ctx.fillRect(x+4, y+4, w-8, h-9);
+    ctx.fillStyle='#f39c12'; ctx.fillRect(x+4, y, w-8, 5);
     ctx.strokeStyle='rgba(255,255,255,0.3)'; ctx.lineWidth=1;
     for (let i=1;i<3;i++) {
-      const ly = this.y+4+i*((this.h-9)/3);
-      ctx.beginPath(); ctx.moveTo(this.x+4,ly); ctx.lineTo(this.x+this.w-4,ly); ctx.stroke();
+      const ly = y+4+i*((h-9)/3);
+      ctx.beginPath(); ctx.moveTo(x+4,ly); ctx.lineTo(x+w-4,ly); ctx.stroke();
     }
   }
 
-  _dZone(ctx, color, label) {
-    ctx.fillStyle=color+'28'; ctx.fillRect(this.x,this.y,this.w,this.h);
+  _dZone(ctx, x, y, w, h, color, label) {
+    ctx.fillStyle=color+'28'; ctx.fillRect(x,y,w,h);
     ctx.strokeStyle=color; ctx.lineWidth=2; ctx.setLineDash([6,3]);
-    ctx.strokeRect(this.x+1,this.y+1,this.w-2,this.h-2); ctx.setLineDash([]);
+    ctx.strokeRect(x+1,y+1,w-2,h-2); ctx.setLineDash([]);
     ctx.fillStyle=color; ctx.font='bold 11px monospace'; ctx.textAlign='center';
-    ctx.fillText(label, this.x+this.w/2, this.y+this.h/2+4);
+    ctx.fillText(label, x+w/2, y+h/2+4);
   }
 }
 
@@ -242,17 +261,19 @@ class Player {
     this._coyote=0; this._jbuf=0; this.ghostMode=false;
   }
 
-  updateLocal(inp, level) {
+  updateLocal(inp, level, placementActive=false) {
     if (this.state==='finished') return null;
 
     if (this.ghostMode) {
-      const spd=5;
-      if (inp.left)  this.x-=spd;
-      if (inp.right) this.x+=spd;
-      if (inp.up)    this.y-=spd;
-      if (inp.down)  this.y+=spd;
-      if (inp.left)  this.facing=-1;
-      if (inp.right) this.facing=1;
+      if (!placementActive) {
+        const spd=5;
+        if (inp.left)  this.x-=spd;
+        if (inp.right) this.x+=spd;
+        if (inp.up)    this.y-=spd;
+        if (inp.down)  this.y+=spd;
+        if (inp.left)  this.facing=-1;
+        if (inp.right) this.facing=1;
+      }
       this.vx=0; this.vy=0; this.onGround=false;
       return null;
     }
@@ -408,39 +429,63 @@ class Player {
 class Placement {
   constructor() {
     this.active=false; this.type='platform'; this.team=null;
-    this.gx=0; this.gy=0;
+    this.rotation=0;
+    this.cx=0; this.cy=0; // world-space cursor centre
   }
 
-  open(team) { this.active=true; this.team=team; this.type='platform'; }
-  close()    { this.active=false; }
+  open(team, wx, wy) {
+    this.active=true; this.team=team;
+    this.cx=wx; this.cy=wy;
+    // keep type & rotation from previous placement for convenience
+  }
+  close() { this.active=false; }
 
-  // camX/camY convert screen-space mouse to world-space
-  update(inp, camX, camY) {
+  // Cursor grid position (top-left of ghost object)
+  get gx() { const d=this._def(); return snap(this.cx - d.w/2); }
+  get gy() { const d=this._def(); return snap(this.cy - d.h/2); }
+
+  _def() {
+    const base = OBJ[this.type];
+    const rot  = this.rotation;
+    return (rot===90||rot===270)
+      ? { w:base.h, h:base.w }
+      : { w:base.w, h:base.h };
+  }
+
+  update(inp) {
     if (!this.active) return;
-    const def=OBJ[this.type];
-    this.gx = snap(inp.mx + camX - def.w/2);
-    this.gy = snap(inp.my + camY - def.h/2);
+    const spd=6;
+    if (inp.left  || inp.k.ArrowLeft)  this.cx -= spd;
+    if (inp.right || inp.k.ArrowRight) this.cx += spd;
+    if (inp.up    || inp.k.ArrowUp)    this.cy -= spd;
+    if (inp.down  || inp.k.ArrowDown)  this.cy += spd;
     if (inp.pressed('Digit1')) this.type='platform';
     if (inp.pressed('Digit2')) this.type='spike';
     if (inp.pressed('Digit3')) this.type='spring';
+    if (inp.pressed('KeyR'))   this.rotation=(this.rotation+90)%360;
     if (inp.pressed('Escape')) this.close();
   }
 
   build(placedBy) {
-    const def=OBJ[this.type];
-    return { id:uid(), type:this.type, x:this.gx, y:this.gy,
-             w:def.w, h:def.h, team:this.team, placedBy, permanent:false };
+    const def=this._def();
+    const base=OBJ[this.type];
+    // For 90/270 the AABB dimensions are already swapped in _def(); store
+    // original visual dims via rotation so draw() can unswap them.
+    return { id:uid(), type:this.type,
+             x:this.gx, y:this.gy, w:def.w, h:def.h,
+             rotation:this.rotation, team:this.team, placedBy, permanent:false };
   }
 
   // Called inside camera transform (world space)
   drawGhost(ctx) {
     if (!this.active) return;
-    const def=OBJ[this.type];
-    const ghost=new GO({ id:'g', type:this.type, x:this.gx, y:this.gy,
-                         w:def.w, h:def.h, team:this.team });
+    const def=this._def();
+    const ghost=new GO({ id:'g', type:this.type,
+                         x:this.gx, y:this.gy, w:def.w, h:def.h,
+                         rotation:this.rotation, team:this.team });
     ctx.globalAlpha=0.5; ghost.draw(ctx); ctx.globalAlpha=1;
     ctx.strokeStyle='#f1c40f'; ctx.lineWidth=2;
-    ctx.strokeRect(this.gx,this.gy,def.w,def.h);
+    ctx.strokeRect(this.gx, this.gy, def.w, def.h);
   }
 
   // Called in screen space — toolbar at bottom of viewport
@@ -449,13 +494,16 @@ class Placement {
     const types=Object.keys(OBJ);
     const bw=150, bh=38, gap=8;
     const total=types.length*(bw+gap)-gap;
-    const bx0=(vw-total)/2, by=vh-52;
+    const bx0=(vw-total)/2, by=vh-56;
 
-    ctx.fillStyle='rgba(0,0,0,.82)';
-    ctx.fillRect(bx0-10, by-34, total+20, 90);
+    ctx.fillStyle='rgba(0,0,0,.85)';
+    ctx.fillRect(bx0-12, by-42, total+24, 100);
     ctx.fillStyle='#f1c40f'; ctx.font='12px monospace'; ctx.textAlign='center';
-    ctx.fillText('Click to place  ·  [1] Platform  [2] Spike  [3] Spring  [ESC] Cancel',
-                 vw/2, by-16);
+    ctx.fillText(
+      `WASD/Arrows to move  ·  [R] Rotate (${this.rotation}°)  ·  [Space] Place  ·  [Esc] Cancel`,
+      vw/2, by-26);
+    ctx.fillStyle='#aaa';
+    ctx.fillText('[1] Platform  [2] Spike  [3] Spring', vw/2, by-10);
 
     types.forEach((t,i) => {
       const tx=bx0+i*(bw+gap);
@@ -548,7 +596,7 @@ class Renderer {
     const lp=game.localPlayer;
     if (phase==='build' && lp && !game.placement.active) {
       const msg = lp.placementsLeft>0
-        ? `WASD to fly  ·  [E] place object  (${lp.placementsLeft} left)`
+        ? `WASD to fly  ·  [E] aim object  ·  [Space] place  (${lp.placementsLeft} left)`
         : `WASD to fly  ·  no placements left — round starts soon`;
       const bw=520;
       c.fillStyle='rgba(0,0,0,.75)'; c.fillRect(vw/2-bw/2, vh-52, bw, 34);
@@ -908,7 +956,7 @@ class Game {
 
     const lp=this.localPlayer;
     if (lp) {
-      const evt=lp.updateLocal(this.input, this.level);
+      const evt=lp.updateLocal(this.input, this.level, this.placement.active);
 
       this._resolvePlayerCollisions();
 
@@ -963,17 +1011,19 @@ class Game {
     }
 
     if (inp.pressed('KeyE')) {
-      if (this.phase==='build' && lp.placementsLeft>0 && !this.placement.active) {
-        this.placement.open(lp.team);
-      }
-      if (this.phase==='play' && lp.state==='dead' && !this.placement.active) {
-        this.placement.open(lp.team);
+      if (!this.placement.active) {
+        const canPlace =
+          (this.phase==='build' && lp.placementsLeft>0) ||
+          (this.phase==='play'  && lp.state==='dead');
+        if (canPlace) this.placement.open(lp.team, lp.x+PW/2, lp.y+PH/2);
+      } else {
+        this.placement.close();
       }
     }
 
-    this.placement.update(inp, this.cam.x, this.cam.y);
+    this.placement.update(inp);
 
-    if (this.placement.active && inp.clicked) {
+    if (this.placement.active && inp.pressed('Space')) {
       const obj=this.placement.build(this.localId);
       this.level.add(obj);
       this.net.broadcast({ type:'place_object', obj });
