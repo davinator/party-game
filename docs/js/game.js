@@ -58,6 +58,34 @@ const BASE_LEVEL = [
 ];
 
 // ─────────────────────────────────────────────
+//  WAITING ROOM LEVEL
+// ─────────────────────────────────────────────
+const WAITING_LEVEL = [
+  // Full-width floor — falling is impossible
+  { id:'wf',   type:'platform', x:0,    y:640, w:WORLD_W, h:80, permanent:true },
+  // Left beginner section
+  { id:'wp1',  type:'platform', x:180,  y:540, w:180, h:20, permanent:true },
+  { id:'wp2',  type:'platform', x:460,  y:460, w:140, h:20, permanent:true },
+  { id:'wp3',  type:'platform', x:720,  y:380, w:120, h:20, permanent:true },
+  { id:'wp4',  type:'platform', x:960,  y:460, w:160, h:20, permanent:true },
+  // Staircase section
+  { id:'ws1',  type:'platform', x:1200, y:560, w:110, h:20, permanent:true },
+  { id:'ws2',  type:'platform', x:1360, y:480, w:110, h:20, permanent:true },
+  { id:'ws3',  type:'platform', x:1520, y:400, w:110, h:20, permanent:true },
+  { id:'ws4',  type:'platform', x:1680, y:320, w:110, h:20, permanent:true },
+  // Wide landing
+  { id:'wp5',  type:'platform', x:1900, y:490, w:280, h:20, permanent:true },
+  // Right section
+  { id:'wp6',  type:'platform', x:2280, y:410, w:180, h:20, permanent:true },
+  { id:'wp7',  type:'platform', x:2560, y:510, w:160, h:20, permanent:true },
+  { id:'wp8',  type:'platform', x:2820, y:430, w:200, h:20, permanent:true },
+  // Springs for fun
+  { id:'wsp1', type:'spring', x:370,  y:624, w:48, h:16, permanent:true },
+  { id:'wsp2', type:'spring', x:1820, y:624, w:48, h:16, permanent:true },
+  { id:'wsp3', type:'spring', x:2480, y:624, w:48, h:16, permanent:true },
+];
+
+// ─────────────────────────────────────────────
 //  UTILITIES
 // ─────────────────────────────────────────────
 function uid() {
@@ -605,6 +633,16 @@ class Renderer {
     }
   }
 
+  drawWaitingHUD(game) {
+    const c = this.ctx;
+    const { vw, vh } = game;
+    // Subtle bottom bar
+    c.fillStyle = 'rgba(0,0,0,0.55)';
+    c.fillRect(0, vh-36, vw, 36);
+    c.fillStyle = '#f1c40f'; c.font = 'bold 13px monospace'; c.textAlign = 'center';
+    c.fillText('WAITING ROOM  ·  A/D move  ·  Space jump  ·  Touch the springs!', vw/2, vh-13);
+  }
+
   drawDeathPrompt(game) {
     const lp=game.localPlayer;
     if (!lp||lp.state!=='dead'||game.placement.active||game.phase!=='play') return;
@@ -735,7 +773,7 @@ class Game {
     });
 
     document.getElementById('start-btn').addEventListener('click', ()=>{
-      if (this.isHost && this.phase==='lobby') this._hostStartBuild();
+      if (this.isHost && (this.phase==='lobby'||this.phase==='waiting')) this._hostStartBuild();
     });
   }
 
@@ -743,6 +781,7 @@ class Game {
     const btn=document.getElementById('join-btn');
     btn.disabled=true; btn.textContent='Connecting…';
     this.localId=uid();
+    this.roomId=roomId;
     const colorIdx=Math.floor(Math.random()*PALETTE.length);
     this._pendingInfo={ name, team, colorIdx };
     try {
@@ -752,9 +791,6 @@ class Game {
       alert('Connection failed. Is the server running?\n'+e.message); return;
     }
     this._wireNetwork();
-    document.getElementById('connect-form').style.display='none';
-    document.getElementById('lobby-waiting').style.display='block';
-    document.getElementById('status-msg').textContent='Connected! Share the room code.';
   }
 
   _wireNetwork() {
@@ -764,26 +800,29 @@ class Game {
       this.isHost=msg.isHost;
       const {name,team,colorIdx}=this._pendingInfo;
       this._addPlayer(this.localId, name, team, colorIdx);
-      this._refreshLobbyList();
       if (this.isHost) document.getElementById('start-btn').style.display='block';
+      this._enterWaiting();
     });
 
     net.on('player_joined', msg=>{
       this._addPlayer(msg.playerId, msg.name, msg.team, msg.colorIdx);
-      this._refreshLobbyList();
     });
 
     net.on('state_sync', msg=>{
       if (msg.to!==this.localId) return;
-      this.level.load(msg.objects);
-      this.phase=msg.phase; this.timer=msg.timer;
       this.scores=msg.scores; this.round=msg.round;
       msg.players.forEach(p=>{
         if (p.id!==this.localId) this._addPlayer(p.id,p.name,p.team,p.colorIdx);
         const pl=this.players[p.id];
         if (pl) { pl.x=p.x; pl.y=p.y; pl.state=p.state; }
       });
-      if (this.phase!=='lobby') this._enterGame();
+      if (msg.phase==='waiting' || msg.phase==='lobby') {
+        this._enterWaiting();
+      } else {
+        this.level.load(msg.objects);
+        this.phase=msg.phase; this.timer=msg.timer;
+        this._enterGame();
+      }
     });
 
     net.on('state_request', msg=>{
@@ -851,6 +890,24 @@ class Game {
       `${cnt} player${cnt!==1?'s':''} in room. Share the room code!`;
   }
 
+  _refreshWaitingPanel() {
+    const ul = document.getElementById('player-list');
+    if (!ul) return;
+    ul.innerHTML = '';
+    Object.values(this.players).forEach(p => {
+      const li = document.createElement('li');
+      const tc = TEAM[p.team];
+      li.innerHTML = `<span class="dot dot-${p.team}"></span>
+        <strong>${p.name}</strong>
+        ${p.id===this.localId ? '<span class="host-badge">YOU</span>' : ''}
+        ${this.isHost&&p.id===this.localId ? '<span class="host-badge" style="background:#f1c40f">HOST</span>' : ''}`;
+      ul.appendChild(li);
+    });
+    const cnt = Object.keys(this.players).length;
+    const msg = document.getElementById('status-msg');
+    if (msg) msg.textContent = `Room: ${this.roomId||'?'}  ·  ${cnt} player${cnt!==1?'s':''}`;
+  }
+
   // ── PHASES ──
   _hostStartBuild() {
     this._applyPhase('build', BUILD_TIME);
@@ -881,12 +938,33 @@ class Game {
     }
   }
 
-  _enterGame() {
-    document.getElementById('overlay').style.display='none';
-    this.canvas.style.display='block';
+  _enterWaiting() {
+    this.phase = 'waiting';
+    this.level.objects = WAITING_LEVEL.map(o => new GO({...o}));
+    // Spawn local player near the left side
+    const lp = this.localPlayer;
+    if (lp) {
+      lp.spawn(300, 580);
+      this.cam.x = 0; this.cam.y = 0;
+    }
+    // Show canvas, shrink overlay to corner panel
+    this.canvas.style.display = 'block';
+    const ov = document.getElementById('overlay');
+    ov.classList.add('compact');
     if (!this._loopStarted) {
-      this._loopStarted=true;
-      requestAnimationFrame(ts=>this._loop(ts));
+      this._loopStarted = true;
+      requestAnimationFrame(ts => this._loop(ts));
+    }
+  }
+
+  _enterGame() {
+    const ov = document.getElementById('overlay');
+    ov.style.display = 'none';
+    ov.classList.remove('compact');
+    this.canvas.style.display = 'block';
+    if (!this._loopStarted) {
+      this._loopStarted = true;
+      requestAnimationFrame(ts => this._loop(ts));
     }
   }
 
@@ -921,6 +999,9 @@ class Game {
     this._updateCamera();
     this._render();
     this.input.update();
+
+    // Keep waiting-room player list fresh
+    if (this.phase==='waiting') this._refreshWaitingPanel();
   }
 
   _tick(dt) {
@@ -936,6 +1017,16 @@ class Game {
 
   _step() {
     if (this.phase==='lobby') return;
+
+    if (this.phase==='waiting') {
+      const lp = this.localPlayer;
+      if (lp) lp.updateLocal(this.input, this.level, this.placement.active);
+      this._sendTick = (this._sendTick||0) + 1;
+      if (this._sendTick%3===0 && lp) {
+        this.net.broadcast({ type:'player_update', ...lp.snap() });
+      }
+      return;
+    }
 
     if (this.timer>0) {
       this.timer-=1/60;
@@ -1065,9 +1156,13 @@ class Game {
 
     // ── Screen-space HUD / overlays ──
     this.placement.drawBar(ctx, vw, vh);
-    r.drawHUD(this);
-    r.drawDeathPrompt(this);
-    if (this.phase==='results') r.drawResults(this);
+    if (this.phase==='waiting') {
+      r.drawWaitingHUD(this);
+    } else {
+      r.drawHUD(this);
+      r.drawDeathPrompt(this);
+      if (this.phase==='results') r.drawResults(this);
+    }
   }
 }
 

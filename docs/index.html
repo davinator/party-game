@@ -130,6 +130,31 @@
 
     #lobby-waiting { display: none; }
 
+    /* ── COMPACT MODE (waiting room) ── */
+    #overlay.compact {
+      inset: auto;
+      top: 16px;
+      right: 16px;
+      left: auto;
+      background: none;
+      align-items: flex-start;
+      justify-content: flex-end;
+      pointer-events: none;
+    }
+    #overlay.compact .panel {
+      width: 260px;
+      padding: 16px 18px;
+      background: rgba(10,10,26,0.88);
+      border-color: #444;
+      pointer-events: all;
+    }
+    #overlay.compact h1   { font-size: 1rem; margin-bottom: 4px; }
+    #overlay.compact .subtitle { display: none; }
+    #overlay.compact #connect-form { display: none !important; }
+    #overlay.compact #lobby-waiting { display: block; }
+    #overlay.compact .waiting-header { font-size: 0.85rem; margin-bottom: 10px; }
+    #overlay.compact .primary-btn { margin-top: 12px; padding: 9px; font-size: 0.85rem; }
+
     .waiting-header {
       font-size: 1.1rem;
       color: #2ecc71;
@@ -139,17 +164,17 @@
     #player-list {
       list-style: none;
       text-align: left;
-      margin-bottom: 20px;
-      min-height: 60px;
+      margin-bottom: 12px;
+      min-height: 40px;
     }
     #player-list li {
-      padding: 6px 10px;
-      margin-bottom: 4px;
+      padding: 4px 6px;
+      margin-bottom: 3px;
       border-radius: 3px;
-      font-size: 0.85rem;
+      font-size: 0.8rem;
       display: flex;
       align-items: center;
-      gap: 8px;
+      gap: 6px;
     }
     .dot {
       width: 10px; height: 10px;
