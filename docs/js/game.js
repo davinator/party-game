@@ -292,11 +292,14 @@ class Player {
     // Move X
     this.x += this.vx;
     this._resolveX(solids);
+    if (this.x < 0)            { this.x = 0;            this.vx = 0; }
+    if (this.x > WORLD_W - PW) { this.x = WORLD_W - PW; this.vx = 0; }
 
     // Move Y
     this.onGround=false;
     this.y += this.vy;
     this._resolveY(solids);
+    if (this.y < -WORLD_H) { this.y = -WORLD_H; if (this.vy < 0) this.vy = 0; }
 
     // Springs
     for (const s of springs) {
@@ -899,6 +902,8 @@ class Game {
     if (lp) {
       const evt=lp.updateLocal(this.input, this.level);
 
+      this._resolvePlayerCollisions();
+
       if (evt==='died' && lp.state==='alive') {
         lp.state='dead'; lp.ghostMode=true; this.placement.close();
         this.net.broadcast({ type:'player_event', playerId:this.localId, event:'died' });
@@ -920,6 +925,24 @@ class Game {
     this._sendTick=(this._sendTick||0)+1;
     if (this._sendTick%3===0 && lp) {
       this.net.broadcast({ type:'player_update', ...lp.snap() });
+    }
+  }
+
+  _resolvePlayerCollisions() {
+    const lp = this.localPlayer;
+    if (!lp || lp.ghostMode || lp.state !== 'alive') return;
+    for (const p of Object.values(this.players)) {
+      if (p.id === this.localId || p.ghostMode || p.state !== 'alive') continue;
+      if (!overlap(lp.x, lp.y, PW, PH, p.x, p.y, PW, PH)) continue;
+      const olL = (lp.x+PW) - p.x;
+      const olR = (p.x+PW) - lp.x;
+      const olU = (lp.y+PH) - p.y;
+      const olD = (p.y+PH) - lp.y;
+      const min = Math.min(olL, olR, olU, olD);
+      if      (min === olL) { lp.x -= olL; if (lp.vx > 0) lp.vx *= 0.3; }
+      else if (min === olR) { lp.x += olR; if (lp.vx < 0) lp.vx *= 0.3; }
+      else if (min === olU) { lp.y -= olU; if (lp.vy > 0) { lp.vy = 0; lp.onGround = true; } }
+      else                  { lp.y += olD; if (lp.vy < 0) lp.vy = 0; }
     }
   }
 
