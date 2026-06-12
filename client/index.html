@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Party Platformer</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #0d0d1a;
+      color: #fff;
+      font-family: 'Courier New', monospace;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      overflow: hidden;
+    }
+
+    #canvas {
+      display: none;
+      position: fixed;
+      inset: 0;
+      cursor: crosshair;
+    }
+
+    /* ── OVERLAY ── */
+    #overlay {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: radial-gradient(ellipse at center, #1a1a3e 0%, #0d0d1a 100%);
+      z-index: 100;
+    }
+
+    .panel {
+      background: rgba(255,255,255,0.05);
+      border: 2px solid #333;
+      border-radius: 8px;
+      padding: 36px 44px;
+      width: 460px;
+      text-align: center;
+    }
+
+    h1 {
+      font-size: 2rem;
+      letter-spacing: 2px;
+      margin-bottom: 8px;
+      color: #f1c40f;
+      text-shadow: 0 0 20px #f1c40f88;
+    }
+
+    .subtitle {
+      font-size: 0.78rem;
+      color: #888;
+      margin-bottom: 28px;
+    }
+
+    label {
+      display: block;
+      font-size: 0.72rem;
+      color: #aaa;
+      text-align: left;
+      margin-bottom: 4px;
+      margin-top: 14px;
+    }
+
+    input[type="text"] {
+      width: 100%;
+      padding: 10px 12px;
+      background: rgba(255,255,255,0.08);
+      border: 1px solid #444;
+      border-radius: 4px;
+      color: #fff;
+      font-family: inherit;
+      font-size: 0.95rem;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    input[type="text"]:focus { border-color: #f1c40f; }
+
+    .team-row {
+      display: flex;
+      gap: 12px;
+      margin-top: 16px;
+    }
+
+    .team-btn {
+      flex: 1;
+      padding: 10px;
+      border: 2px solid #555;
+      border-radius: 4px;
+      background: rgba(255,255,255,0.05);
+      color: #aaa;
+      font-family: inherit;
+      font-size: 0.85rem;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .team-btn:hover { opacity: 0.85; }
+    .team-btn[data-team="red"].active  { border-color: #e74c3c; background: #e74c3c33; color: #ff8a80; }
+    .team-btn[data-team="blue"].active { border-color: #3498db; background: #3498db33; color: #82b1ff; }
+
+    .primary-btn {
+      display: block;
+      width: 100%;
+      margin-top: 22px;
+      padding: 13px;
+      background: #f1c40f;
+      color: #000;
+      border: none;
+      border-radius: 4px;
+      font-family: inherit;
+      font-size: 1rem;
+      font-weight: bold;
+      cursor: pointer;
+      letter-spacing: 1px;
+      transition: opacity 0.2s;
+    }
+    .primary-btn:hover:not(:disabled) { opacity: 0.85; }
+    .primary-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    .green-btn {
+      background: #2ecc71;
+    }
+
+    #lobby-waiting { display: none; }
+
+    .waiting-header {
+      font-size: 1.1rem;
+      color: #2ecc71;
+      margin-bottom: 20px;
+    }
+
+    #player-list {
+      list-style: none;
+      text-align: left;
+      margin-bottom: 20px;
+      min-height: 60px;
+    }
+    #player-list li {
+      padding: 6px 10px;
+      margin-bottom: 4px;
+      border-radius: 3px;
+      font-size: 0.85rem;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .dot {
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      display: inline-block;
+    }
+    .dot-red  { background: #e74c3c; }
+    .dot-blue { background: #3498db; }
+
+    .host-badge {
+      font-size: 0.65rem;
+      background: #f1c40f;
+      color: #000;
+      padding: 1px 5px;
+      border-radius: 2px;
+    }
+
+    #status-msg {
+      font-size: 0.75rem;
+      color: #888;
+      min-height: 18px;
+    }
+
+    #start-btn { display: none; }
+  </style>
+</head>
+<body>
+
+<div id="overlay">
+  <div class="panel">
+    <h1>PARTY PLATFORMER</h1>
+    <p class="subtitle">Multiplayer chaos — die, then make it harder for everyone else</p>
+
+    <!-- Connect form -->
+    <div id="connect-form">
+      <label>Your name</label>
+      <input type="text" id="player-name" placeholder="Player" maxlength="16" />
+
+      <label>Room code</label>
+      <input type="text" id="room-code" placeholder="my-room-123" maxlength="32" />
+
+      <label>Server address</label>
+      <input type="text" id="server-addr" value="localhost:8080" />
+
+      <label>Team</label>
+      <div class="team-row">
+        <button class="team-btn" data-team="red">🔴 Red Team</button>
+        <button class="team-btn" data-team="blue">🔵 Blue Team</button>
+      </div>
+
+      <button class="primary-btn" id="join-btn">JOIN ROOM</button>
+    </div>
+
+    <!-- Waiting lobby -->
+    <div id="lobby-waiting">
+      <p class="waiting-header">Waiting in lobby…</p>
+      <ul id="player-list"></ul>
+      <p id="status-msg">Share the room code with friends!</p>
+      <button class="primary-btn green-btn" id="start-btn">▶ START GAME (host only)</button>
+    </div>
+  </div>
+</div>
+
+<canvas id="canvas"></canvas>
+
+<script src="js/game.js"></script>
+</body>
+</html>
