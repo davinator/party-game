@@ -11,101 +11,92 @@ No waiting, no spectating, just chaos.
 
 ---
 
-## Play online
+## Play
 
-The client is hosted on GitHub Pages. To play with friends:
+**Client:** https://davinator.github.io/party-game/
 
-1. Deploy the relay server (see below) and note its public URL.
-2. Open the GitHub Pages URL in multiple browsers.
-3. Enter the server address, pick a room code, and go.
+The client is a static page — no install needed. You just need a relay server running
+somewhere everyone can reach.
 
 ---
 
-## Run locally
+## Quickstart options
 
-### 1. Start the relay server
-
-```bash
-cd server
-npm install
-npm start
-# → ws://localhost:8080
-```
-
-### 2. Open the client
+### Option A — Same machine (testing)
 
 ```bash
-# Python 3
-cd docs && python3 -m http.server 3000
-
-# Node
-cd docs && npx serve .
+cd server && npm install && npm start
 ```
 
-Open `http://localhost:3000` in multiple tabs (or across machines on the same network).
+Open `https://davinator.github.io/party-game/` in multiple tabs.  
+Server address: `localhost:8080`
+
+### Option B — LAN / office party
+
+Run the server on one machine:
+```bash
+cd server && npm install && npm start
+```
+
+Everyone opens the GitHub Pages URL and enters `<host-machine-IP>:8080` as the server address.  
+Find your local IP with `ipconfig` (Windows) or `ifconfig` / `ip a` (Mac/Linux).
+
+### Option C — Internet play
+
+Deploy the server to any Node host (see below), then share the server address with players.
 
 ---
 
 ## Deploy the relay server
 
-The server is a ~120-line Node.js WebSocket relay with no database or state beyond
-in-memory rooms. Any platform that runs Node works.
+The server is a ~120-line Node.js WebSocket relay. No database, no state beyond in-memory rooms.
 
-**Railway**
+**Railway** (easiest)
 ```bash
-# From repo root
-railway up --service server
+cd server
+railway init
+railway up
 ```
+Set the `PORT` env var if needed. Railway provides a public URL — use `wss://` in the client.
 
 **Fly.io**
 ```bash
 cd server
-fly launch   # follow prompts, set PORT env var
+fly launch   # accept defaults, set PORT
 fly deploy
 ```
 
-**Self-hosted / VPS**
+**VPS / self-hosted**
 ```bash
 cd server && npm install
 PORT=8080 node server.js
-# expose port 8080, then use ws://<your-ip>:8080 in the client
 ```
-
-After deploying, players enter `your-domain.com:PORT` (or `wss://` if behind TLS)
-in the **Server address** field on the join screen.
-
----
-
-## GitHub Pages setup
-
-1. Push this repo to GitHub.
-2. Go to **Settings → Pages**.
-3. Set source to **Deploy from a branch**, branch `main`, folder `/docs`.
-4. The game will be live at `https://<you>.github.io/<repo>/`.
+Expose port 8080 (or put it behind nginx with TLS). Use `wss://your-domain` in the client.
 
 ---
 
 ## How to play
 
-1. Enter a name, room code, and pick a team.
-2. Everyone joins the same room code — first joiner is **host**.
-3. Host clicks **▶ START GAME**.
-4. **Build Phase (30s):** each player places 2 objects.
-5. **Race Phase (120s):** reach the FINISH flag.
-6. Dead? Fly around with WASD and press `[E]` to drop an obstacle!
-7. Host presses `[R]` to start the next round.
+1. Everyone opens the client URL and enters the same **room code**.
+2. Enter the **server address** (e.g. `localhost:8080` or `my-server.railway.app`).
+3. Pick a name and team, then click **JOIN ROOM**.
+4. First person to join is **host** — they click **▶ START GAME**.
+5. **Build Phase (30s):** each player ghosts around and places up to 2 objects.
+6. **Race Phase (120s):** reach the FINISH flag. Bump other players off ledges.
+7. **Dead?** Keep flying with WASD and press `[E]` to drop an obstacle on survivors.
+8. Host presses `[R]` to start the next round.
 
 ---
 
 ## Controls
 
-| Action | Key |
+| Action | Keys |
 |---|---|
-| Move | `A / D` or `←/→` |
-| Jump | `Space / W / ↑` |
-| Ghost fly (when dead/build) | `WASD` or arrow keys |
+| Move | `A / D` or `← / →` |
+| Jump | `Space`, `W`, or `↑` |
+| Ghost fly | `W A S D` or arrow keys |
 | Open placement | `E` |
-| Switch object type | `1` Platform · `2` Spike · `3` Spring |
+| Switch object | `1` Platform · `2` Spike · `3` Spring |
 | Cancel placement | `Esc` |
 | Next round (host) | `R` |
 
@@ -113,7 +104,7 @@ in the **Server address** field on the join screen.
 
 ## Scoring
 
-- **+10 pts** for each player on your team who crosses the finish line.
+**+10 pts** per player on your team who crosses the finish line each round.
 
 ---
 
@@ -121,13 +112,13 @@ in the **Server address** field on the join screen.
 
 ```
 server/server.js   Pure WebSocket relay — no game logic.
-                   Rooms auto-created, first joiner = host.
+                   Rooms auto-created; first joiner = host.
                    Host sends full state snapshot to late joiners.
 
-docs/js/game.js    Entire game engine — physics, rendering, net sync.
+docs/js/game.js    Entire game engine: physics, rendering, net sync.
                    Client-authoritative for the local player.
-                   Remote players smoothly interpolate to broadcasted positions.
+                   Remote players interpolate to broadcasted positions.
+                   Canvas fills the window; camera follows local player.
 ```
 
-The server never validates game state — it only relays JSON messages between
-clients in the same room. The host drives phase transitions (build → play → results).
+The server never validates game state — it only relays JSON between clients in the same room.
