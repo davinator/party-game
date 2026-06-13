@@ -31,9 +31,11 @@ const TEAM = {
 };
 
 const OBJ = {
-  platform: { w: 128, h: 20, label: 'Platform', key: '1' },
-  spike:    { w: 32,  h: 24, label: 'Spike',    key: '2' },
-  spring:   { w: 48,  h: 16, label: 'Spring',   key: '3' },
+  platform:         { w: 128, h: 20, label: 'Platform',    key: '1' },
+  spike:            { w: 32,  h: 24, label: 'Spike',       key: '2' },
+  spring:           { w: 48,  h: 16, label: 'Spring',      key: '3' },
+  moving_platform:  { w: 128, h: 20, label: 'Moving plat', key: '4',
+                      defaults: { rangeX:200, rangeY:0, speed:1.2 } },
 };
 
 const PALETTE = [
@@ -148,20 +150,42 @@ class GO {
     this.id        = d.id || uid();
     this.type      = d.type;
     this.x = d.x; this.y = d.y; this.w = d.w; this.h = d.h;
-    this.rotation  = d.rotation || 0; // 0 | 90 | 180 | 270  (AABB w/h swapped at 90/270)
+    this.rotation  = d.rotation || 0;
     this.permanent = !!d.permanent;
     this.placedBy  = d.placedBy || null;
     this.team      = d.team || null;
-    this.solid     = d.type === 'platform';
+    this.solid     = d.type === 'platform' || d.type === 'moving_platform';
     this.hazard    = d.type === 'spike';
     this.isSpring  = d.type === 'spring';
     this.isEnd     = d.type === 'end_zone';
+    // Moving platform
+    this.baseX  = d.baseX  ?? d.x;
+    this.baseY  = d.baseY  ?? d.y;
+    this.rangeX = d.rangeX ?? 0;
+    this.rangeY = d.rangeY ?? 0;
+    this.speed  = d.speed  ?? 1.2;
+    this._vx = 0; this._vy = 0; // per-tick velocity (set by update())
   }
 
   toJSON() {
-    return { id:this.id, type:this.type, x:this.x, y:this.y, w:this.w, h:this.h,
-             rotation:this.rotation, permanent:this.permanent,
-             placedBy:this.placedBy, team:this.team };
+    const o = { id:this.id, type:this.type, x:this.x, y:this.y, w:this.w, h:this.h,
+                rotation:this.rotation, permanent:this.permanent,
+                placedBy:this.placedBy, team:this.team };
+    if (this.type === 'moving_platform')
+      Object.assign(o, { baseX:this.baseX, baseY:this.baseY,
+                          rangeX:this.rangeX, rangeY:this.rangeY, speed:this.speed });
+    return o;
+  }
+
+  // Advance dynamic state; t = seconds since phase start
+  update(t) {
+    if (this.type === 'moving_platform') {
+      const nx = this.baseX + this.rangeX * Math.sin(t * this.speed);
+      const ny = this.baseY + this.rangeY * Math.sin(t * this.speed);
+      this._vx = nx - this.x;
+      this._vy = ny - this.y;
+      this.x = nx; this.y = ny;
+    }
   }
 
   // Visual dimensions — inverse of the AABB swap applied at creation for 90°/270°
@@ -183,12 +207,54 @@ class GO {
 
   _drawAt(ctx, x, y, w, h) {
     switch(this.type) {
-      case 'platform':   this._dPlat(ctx,x,y,w,h);  break;
-      case 'spike':      this._dSpike(ctx,x,y,w,h); break;
-      case 'spring':     this._dSpring(ctx,x,y,w,h);break;
-      case 'start_zone': this._dZone(ctx,x,y,w,h,'#2ecc71','START');  break;
-      case 'end_zone':   this._dZone(ctx,x,y,w,h,'#f1c40f','FINISH'); break;
+      case 'platform':        this._dPlat(ctx,x,y,w,h);         break;
+      case 'moving_platform': this._dMovingPlat(ctx,x,y,w,h);   break;
+      case 'spike':           this._dSpike(ctx,x,y,w,h);        break;
+      case 'spring':          this._dSpring(ctx,x,y,w,h);       break;
+      case 'start_zone':      this._dZone(ctx,x,y,w,h,'#2ecc71','START');  break;
+      case 'end_zone':        this._dZone(ctx,x,y,w,h,'#f1c40f','FINISH'); break;
     }
+  }
+
+  _dMovingPlat(ctx, x, y, w, h) {
+    const tc = this.team ? TEAM[this.team] : null;
+    // Range track line
+    if (this.rangeX || this.rangeY) {
+      const cx2 = this.baseX + w/2, cy2 = this.baseY + h/2;
+      ctx.save();
+      ctx.setLineDash([5,5]);
+      ctx.strokeStyle='rgba(255,255,255,0.22)'; ctx.lineWidth=2;
+      ctx.beginPath();
+      if (this.rangeX) {
+        ctx.moveTo(this.baseX - this.rangeX, cy2);
+        ctx.lineTo(this.baseX + this.rangeX + w, cy2);
+      } else {
+        ctx.moveTo(cx2, this.baseY - this.rangeY);
+        ctx.lineTo(cx2, this.baseY + this.rangeY + h);
+      }
+      ctx.stroke();
+      ctx.setLineDash([]);
+      // End-stop markers
+      ctx.strokeStyle='rgba(255,255,255,0.45)'; ctx.lineWidth=2;
+      const stops = this.rangeX
+        ? [[this.baseX - this.rangeX, cy2-8, this.baseX - this.rangeX, cy2+8],
+           [this.baseX + this.rangeX + w, cy2-8, this.baseX + this.rangeX + w, cy2+8]]
+        : [[cx2-8, this.baseY - this.rangeY, cx2+8, this.baseY - this.rangeY],
+           [cx2-8, this.baseY + this.rangeY + h, cx2+8, this.baseY + this.rangeY + h]];
+      stops.forEach(([x1,y1,x2,y2])=>{
+        ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke();
+      });
+      ctx.restore();
+    }
+    // Platform body (purple tint to distinguish from static)
+    ctx.fillStyle = tc ? tc.primary : '#6c5ce7';
+    ctx.fillRect(x, y+5, w, h-5);
+    ctx.fillStyle = tc ? tc.light : '#a29bfe';
+    ctx.fillRect(x, y, w, 6);
+    // Direction arrow
+    ctx.fillStyle='rgba(255,255,255,0.6)';
+    ctx.font=`bold ${Math.min(12,h-2)}px monospace`; ctx.textAlign='center';
+    ctx.fillText(this.rangeY ? '↕' : '↔', x+w/2, y+h/2+4);
   }
 
   _dPlat(ctx, x, y, w, h) {
@@ -263,6 +329,7 @@ class Level {
     return { x: sz.x + sz.w/2 - PW/2, y: sz.y - PH - 4 };
   }
 
+  update(t)   { this.objects.forEach(o=>o.update(t)); }
   serialize() { return this.objects.filter(o=>!o.permanent).map(o=>o.toJSON()); }
   load(arr)   { this.reset(); arr.forEach(o=>this.add(o)); }
   draw(ctx)   { this.objects.forEach(o=>o.draw(ctx)); }
@@ -347,8 +414,14 @@ class Player {
     // Move Y
     this.onGround=false;
     this.y += this.vy;
-    this._resolveY(solids);
+    const riding = this._resolveY(solids);
     if (this.y < -WORLD_H) { this.y = -WORLD_H; if (this.vy < 0) this.vy = 0; }
+    // Carry player with moving platform
+    if (riding && (riding._vx || riding._vy)) {
+      this.x += riding._vx;
+      this.y += riding._vy;
+      this._resolveX(solids); // re-check after horizontal carry
+    }
 
     // Springs
     for (const s of springs) {
@@ -376,12 +449,14 @@ class Player {
     }
   }
   _resolveY(solids) {
+    let riding = null;
     for (const o of solids) {
       if (!overlap(this.x,this.y,PW,PH, o.x,o.y,o.w,o.h)) continue;
       const ot=(this.y+PH)-o.y, ob=(o.y+o.h)-this.y;
-      if (ot<ob) { this.y-=ot; if(this.vy>0){this.vy=0; this.onGround=true;} }
+      if (ot<ob) { this.y-=ot; if(this.vy>0){this.vy=0; this.onGround=true; riding=o;} }
       else       { this.y+=ob; if(this.vy<0) this.vy=0; }
     }
+    return riding;
   }
 
   applyRemote(d) {
@@ -497,20 +572,26 @@ class Placement {
   build(placedBy) {
     const def=this._def();
     const base=OBJ[this.type];
-    // For 90/270 the AABB dimensions are already swapped in _def(); store
-    // original visual dims via rotation so draw() can unswap them.
+    const extras = base.defaults
+      ? { ...base.defaults, baseX:this.gx, baseY:this.gy }
+      : {};
     return { id:uid(), type:this.type,
              x:this.gx, y:this.gy, w:def.w, h:def.h,
-             rotation:this.rotation, team:this.team, placedBy, permanent:false };
+             rotation:this.rotation, team:this.team, placedBy, permanent:false,
+             ...extras };
   }
 
   // Called inside camera transform (world space)
   drawGhost(ctx) {
     if (!this.active) return;
     const def=this._def();
+    const base=OBJ[this.type];
+    const extras = base.defaults
+      ? { ...base.defaults, baseX:this.gx, baseY:this.gy }
+      : {};
     const ghost=new GO({ id:'g', type:this.type,
                          x:this.gx, y:this.gy, w:def.w, h:def.h,
-                         rotation:this.rotation, team:this.team });
+                         rotation:this.rotation, team:this.team, ...extras });
     ctx.globalAlpha=0.5; ghost.draw(ctx); ctx.globalAlpha=1;
     ctx.strokeStyle='#f1c40f'; ctx.lineWidth=2;
     ctx.strokeRect(this.gx, this.gy, def.w, def.h);
@@ -722,6 +803,7 @@ class Game {
 
     this._lastTick    = 0;
     this._acc         = 0;
+    this._phaseTime   = 0; // seconds since phase start — drives deterministic dynamic objects
     this._loopStarted = false;
 
     this._resize();
@@ -915,7 +997,7 @@ class Game {
   }
 
   _applyPhase(phase, timer) {
-    this.phase=phase; this.timer=timer;
+    this.phase=phase; this.timer=timer; this._phaseTime=0;
 
     if (phase==='build') {
       this.level.reset();
@@ -1019,6 +1101,8 @@ class Game {
     if (this.phase==='lobby') return;
 
     if (this.phase==='waiting') {
+      this._phaseTime += 1/60;
+      this.level.update(this._phaseTime);
       const lp = this.localPlayer;
       if (lp) lp.updateLocal(this.input, this.level, this.placement.active);
       this._sendTick = (this._sendTick||0) + 1;
@@ -1027,6 +1111,9 @@ class Game {
       }
       return;
     }
+
+    this._phaseTime += 1/60;
+    this.level.update(this._phaseTime);
 
     if (this.timer>0) {
       this.timer-=1/60;
