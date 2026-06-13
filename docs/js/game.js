@@ -313,67 +313,25 @@ class GO {
   }
 
   _dConveyor(ctx, x, y, w, h) {
-    const tc = this.team ? TEAM[this.team] : null;
-    const goRight = this.rotation < 90 || this.rotation >= 270;
-    ctx.fillStyle = tc ? tc.primary : '#2d6a4f';
-    ctx.fillRect(x, y+5, w, h-5);
-    ctx.fillStyle = tc ? tc.light : '#52b788';
-    ctx.fillRect(x, y, w, 6);
-    // Animated arrow strip
-    ctx.fillStyle='rgba(255,255,255,0.7)';
-    ctx.font=`bold 13px monospace`; ctx.textAlign='left';
-    const arrow = goRight ? '»' : '«';
-    const step  = 22;
-    for (let ax=x+6; ax<x+w-10; ax+=step) {
-      ctx.fillText(arrow, ax, y+h/2+5);
-    }
+    ctx.fillStyle='#e67e22'; ctx.fillRect(x, y, w, h);
+    this._label(ctx, x, y, w, h, 'CONV');
   }
 
   _dIce(ctx, x, y, w, h) {
-    ctx.fillStyle='#74c0fc';
-    ctx.fillRect(x, y, w, h);
-    ctx.fillStyle='rgba(255,255,255,0.55)';
-    ctx.fillRect(x, y, w, 4);
-    // Shine streaks
-    ctx.strokeStyle='rgba(255,255,255,0.3)'; ctx.lineWidth=1;
-    for (let i=0; i<3; i++) {
-      const sx=x+w*0.2+i*w*0.25;
-      ctx.beginPath(); ctx.moveTo(sx,y+2); ctx.lineTo(sx+12,y+h-2); ctx.stroke();
-    }
+    ctx.fillStyle='#74c0fc'; ctx.fillRect(x, y, w, h);
+    this._label(ctx, x, y, w, h, 'ICE');
   }
 
   _dShock(ctx, x, y, w, h) {
-    const tc = this.team ? TEAM[this.team] : null;
-    if (this.shocked) {
-      ctx.fillStyle='#fff176';
-      ctx.fillRect(x, y, w, h);
-      ctx.fillStyle='rgba(255,220,0,0.9)';
-      ctx.fillRect(x, y, w, 5);
-      // Lightning bolts
-      ctx.strokeStyle='#ff6f00'; ctx.lineWidth=2;
-      const bolts = Math.max(2, Math.floor(w/40));
-      for (let i=0;i<bolts;i++) {
-        const bx = x + (i+0.5)*(w/bolts);
-        ctx.beginPath();
-        ctx.moveTo(bx,    y+2);
-        ctx.lineTo(bx-5,  y+h*0.45);
-        ctx.lineTo(bx+3,  y+h*0.45);
-        ctx.lineTo(bx-4,  y+h-2);
-        ctx.stroke();
-      }
-    } else {
-      ctx.fillStyle = tc ? tc.primary : '#37474f';
-      ctx.fillRect(x, y+5, w, h-5);
-      ctx.fillStyle = tc ? tc.light : '#546e7a';
-      ctx.fillRect(x, y, w, 6);
-      // Inactive bolt outline
-      ctx.strokeStyle='rgba(255,220,0,0.35)'; ctx.lineWidth=1.5;
-      const bx=x+w/2;
-      ctx.beginPath();
-      ctx.moveTo(bx,   y+3); ctx.lineTo(bx-4, y+h*0.5);
-      ctx.lineTo(bx+3, y+h*0.5); ctx.lineTo(bx-3, y+h-3);
-      ctx.stroke();
-    }
+    ctx.fillStyle = this.shocked ? '#fff176' : '#546e7a';
+    ctx.fillRect(x, y, w, h);
+    this._label(ctx, x, y, w, h, 'ZAP');
+  }
+
+  _label(ctx, x, y, w, h, text) {
+    ctx.fillStyle='rgba(0,0,0,0.45)'; ctx.font='bold 10px monospace';
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText(text, x+w/2, y+h/2);
   }
 
   _dZone(ctx, x, y, w, h, color, label) {
