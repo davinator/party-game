@@ -25,7 +25,7 @@ const RESULTS_TIME     = 8;
 const BUILD_PLACEMENTS = 2;
 
 const CAM_LERP = 0.1; // camera smoothing (lower = smoother/slower)
-const VERSION  = '0.1.21';
+const VERSION  = '0.1.22';
 
 const TEAM = {
   green: { primary: '#27ae60', light: '#2ecc71', name: 'Green Team' },
@@ -184,7 +184,7 @@ class GO {
     this.permanent = !!d.permanent;
     this.placedBy  = d.placedBy || null;
     this.team      = d.team || null;
-    this.solid     = ['platform','moving_platform','conveyor','ice','shock_platform','disappearing','flip_platform','elevator'].includes(d.type);
+    this.solid     = ['platform','moving_platform','conveyor','ice','shock_platform','disappearing','flip_platform','elevator','cannon'].includes(d.type);
     this.hazard    = d.type === 'spike';
     this.isSpring  = d.type === 'spring';
     this.isEnd     = d.type === 'end_zone';
@@ -520,6 +520,10 @@ class Player {
 
     const { solids, hazards, springs, endZone, startZone, blackHoles } = level;
 
+    // Pre-carry: displace with riding platform before own physics to avoid double-counting
+    if (this._riding?._vx) { this.x += this._riding._vx; this._resolveX(solids); }
+    if (this._riding?._vy) this.y += this._riding._vy;
+
     // Horizontal
     if (goLeft)  this.vx -= MOVE_ACCEL;
     if (goRight) this.vx += MOVE_ACCEL;
@@ -562,12 +566,6 @@ class Player {
     this.y += this.vy;
     const riding = this._resolveY(solids);
     if (this.y < -WORLD_H) { this.y = -WORLD_H; if (this.vy < 0) this.vy = 0; }
-    // Carry player with moving platform
-    if (riding && (riding._vx || riding._vy)) {
-      this.x += riding._vx;
-      this.y += riding._vy;
-      this._resolveX(solids); // re-check after horizontal carry
-    }
     // Conveyor push
     if (riding?.type === 'conveyor') {
       const dir = (riding.rotation === 180) ? -1 : 1;
@@ -713,6 +711,7 @@ class Placement {
     return (rot===90||rot===270) ? { w:base.h, h:base.w } : { w:base.w, h:base.h };
   }
 
+  close() { this.active=false; }
   updateMouse(wx, wy) { this.cx=wx; this.cy=wy; }
   rotate() { this.rotation=(this.rotation+90)%360; }
 
