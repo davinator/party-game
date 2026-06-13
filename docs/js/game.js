@@ -41,6 +41,8 @@ const OBJ = {
   shock_platform:   { w: 128, h: 20, label: 'Shock plat',  key: '7' },
   disappearing:     { w: 128, h: 20, label: 'Vanish plat', key: '8' },
   flip_platform:    { w: 128, h: 20, label: 'Flip plat',   key: '9' },
+  elevator:         { w: 80,  h: 20, label: 'Elevator',    key: '0',
+                      defaults: { rangeY: 200 } },
 };
 
 const CONVEYOR_SPEED = 3.2; // px per tick pushed onto player
@@ -49,6 +51,8 @@ const SHOCK_ACTIVE   = 1;   // seconds the shock is lethal
 const VANISH_DELAY   = 0.7; // seconds after trigger before platform disappears
 const VANISH_RESET   = 3.0; // seconds before platform reappears
 const FLIP_PERIOD    = 3.0; // seconds per flip cycle (half platform, half spikes)
+const ELEV_RISE      = 2.0; // seconds to travel up or down
+const ELEV_WAIT      = 1.0; // seconds to pause at top and bottom
 
 const PALETTE = [
   '#e74c3c','#e67e22','#f1c40f','#2ecc71',
@@ -166,7 +170,7 @@ class GO {
     this.permanent = !!d.permanent;
     this.placedBy  = d.placedBy || null;
     this.team      = d.team || null;
-    this.solid     = ['platform','moving_platform','conveyor','ice','shock_platform','disappearing','flip_platform'].includes(d.type);
+    this.solid     = ['platform','moving_platform','conveyor','ice','shock_platform','disappearing','flip_platform','elevator'].includes(d.type);
     this.hazard    = d.type === 'spike';
     this.isSpring  = d.type === 'spring';
     this.isEnd     = d.type === 'end_zone';
@@ -214,6 +218,19 @@ class GO {
       this._gone = elapsed >= VANISH_DELAY && elapsed < VANISH_RESET;
       if (elapsed >= VANISH_RESET) { this._triggered = false; this._gone = false; }
     }
+    if (this.type === 'elevator') {
+      if (!this._triggered) { this.x=this.baseX; this.y=this.baseY; this._vx=0; this._vy=0; return; }
+      const CYCLE = ELEV_RISE*2 + ELEV_WAIT*2;
+      const e = (t - this._triggerT) % CYCLE;
+      let frac;
+      if      (e < ELEV_RISE)               frac = e / ELEV_RISE;
+      else if (e < ELEV_RISE + ELEV_WAIT)   frac = 1;
+      else if (e < ELEV_RISE*2 + ELEV_WAIT) frac = 1 - (e - ELEV_RISE - ELEV_WAIT) / ELEV_RISE;
+      else                                   frac = 0;
+      const ny = this.baseY - this.rangeY * frac;
+      this._vx = 0; this._vy = ny - this.y;
+      this.x = this.baseX; this.y = ny;
+    }
   }
 
   // Visual dimensions — inverse of the AABB swap applied at creation for 90°/270°
@@ -245,6 +262,7 @@ class GO {
       case 'spring':          this._dSpring(ctx,x,y,w,h);       break;
       case 'disappearing':    this._dDisappearing(ctx,x,y,w,h);            break;
       case 'flip_platform':   this._dFlip(ctx,x,y,w,h);                   break;
+      case 'elevator':        this._dElevator(ctx,x,y,w,h);               break;
       case 'start_zone':      this._dZone(ctx,x,y,w,h,'#2ecc71','START');  break;
       case 'end_zone':        this._dZone(ctx,x,y,w,h,'#f1c40f','FINISH'); break;
     }
@@ -346,6 +364,11 @@ class GO {
     ctx.fillStyle = this.shocked ? '#fff176' : '#546e7a';
     ctx.fillRect(x, y, w, h);
     this._label(ctx, x, y, w, h, 'ZAP');
+  }
+
+  _dElevator(ctx, x, y, w, h) {
+    ctx.fillStyle = '#f39c12'; ctx.fillRect(x, y, w, h);
+    this._label(ctx, x, y, w, h, 'ELEV');
   }
 
   _dFlip(ctx, x, y, w, h) {
@@ -1223,7 +1246,7 @@ class Game {
 
       // Trigger disappearing platform on first contact
       const ridingNow = lp._riding;
-      if (ridingNow?.type === 'disappearing' && !ridingNow._triggered) {
+      if (ridingNow && (ridingNow.type==='disappearing'||ridingNow.type==='elevator') && !ridingNow._triggered) {
         ridingNow._triggered = true; ridingNow._triggerT = this._phaseTime;
         this.net.broadcast({ type:'platform_trigger', id:ridingNow.id, t:this._phaseTime });
       }
