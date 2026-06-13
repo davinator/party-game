@@ -44,6 +44,7 @@ const OBJ = {
   elevator:         { w: 80,  h: 20, label: 'Elevator',    key: '0',
                       defaults: { rangeY: 200 } },
   cannon:           { w: 32,  h: 32, label: 'Cannon',      key: 'q' },
+  black_hole:       { w: 40,  h: 40, label: 'Black Hole',  key: 'w' },
 };
 
 const CONVEYOR_SPEED = 3.2; // px per tick pushed onto player
@@ -57,6 +58,9 @@ const ELEV_WAIT      = 1.0; // seconds to pause at top and bottom
 const CANNON_PERIOD  = 3.0; // seconds between shots
 const CANNON_SPEED   = 7;   // pixels per tick
 const CANNON_RANGE   = 700; // pixels before projectile despawns
+const BH_PULL_RADIUS = 280; // pixels of influence
+const BH_KILL_RADIUS = 22;  // pixels from centre = instant death
+const BH_FORCE       = 0.35;// pull acceleration per tick (scales with proximity)
 
 const PALETTE = [
   '#e74c3c','#e67e22','#f1c40f','#2ecc71',
@@ -272,6 +276,7 @@ class GO {
       case 'flip_platform':   this._dFlip(ctx,x,y,w,h);                   break;
       case 'elevator':        this._dElevator(ctx,x,y,w,h);               break;
       case 'cannon':          this._dCannon(ctx,x,y,w,h);                 break;
+      case 'black_hole':      this._dBlackHole(ctx,x,y,w,h);             break;
       case 'start_zone':      this._dZone(ctx,x,y,w,h,'#2ecc71','START');  break;
       case 'end_zone':        this._dZone(ctx,x,y,w,h,'#f1c40f','FINISH'); break;
     }
@@ -404,6 +409,11 @@ class GO {
     this._label(ctx, x, y, w, h, 'CANNON');
   }
 
+  _dBlackHole(ctx, x, y, w, h) {
+    ctx.fillStyle='#1a1a2e'; ctx.fillRect(x, y, w, h);
+    this._label(ctx, x, y, w, h, 'BH');
+  }
+
   _dZone(ctx, x, y, w, h, color, label) {
     ctx.fillStyle=color+'28'; ctx.fillRect(x,y,w,h);
     ctx.strokeStyle=color; ctx.lineWidth=2; ctx.setLineDash([6,3]);
@@ -451,6 +461,7 @@ class Level {
   load(arr)          { this.reset(); arr.forEach(o=>this.add(o)); }
   draw(ctx)          { this.objects.forEach(o=>o.draw(ctx)); }
   projectilesAt(t)   { return this.objects.filter(o=>o.type==='cannon').map(o=>o.projectileAt(t)).filter(Boolean); }
+  get blackHoles()   { return this.objects.filter(o=>o.type==='black_hole'); }
 }
 
 // ─────────────────────────────────────────────
@@ -492,7 +503,7 @@ class Player {
       return null;
     }
 
-    const { solids, hazards, springs, endZone } = level;
+    const { solids, hazards, springs, endZone, blackHoles } = level;
 
     // Horizontal
     if (inp.left)  this.vx -= MOVE_ACCEL;
@@ -557,6 +568,18 @@ class Player {
 
     if (this.onGround && Math.abs(this.vx)>0.4) this.walk+=0.28;
     this._riding = riding;
+
+    // Black hole pull
+    for (const bh of blackHoles) {
+      const cx=bh.x+bh.w/2, cy=bh.y+bh.h/2;
+      const dx=cx-(this.x+PW/2), dy=cy-(this.y+PH/2);
+      const dist=Math.sqrt(dx*dx+dy*dy);
+      if (dist < BH_PULL_RADIUS && dist > 1) {
+        const f = BH_FORCE * (1 - dist/BH_PULL_RADIUS);
+        this.vx += (dx/dist)*f; this.vy += (dy/dist)*f;
+      }
+      if (dist < BH_KILL_RADIUS) return 'died';
+    }
 
     // Death / finish
     for (const hz of hazards) {
