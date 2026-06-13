@@ -103,7 +103,7 @@
       transition: all 0.2s;
     }
     .team-btn:hover { opacity: 0.85; }
-    .team-btn[data-team="red"].active  { border-color: #e74c3c; background: #e74c3c33; color: #ff8a80; }
+    .team-btn[data-team="green"].active { border-color: #27ae60; background: #27ae6033; color: #2ecc71; }
     .team-btn[data-team="blue"].active { border-color: #3498db; background: #3498db33; color: #82b1ff; }
 
     .primary-btn {
@@ -182,7 +182,7 @@
       border-radius: 50%;
       display: inline-block;
     }
-    .dot-red  { background: #e74c3c; }
+    .dot-green { background: #27ae60; }
     .dot-blue { background: #3498db; }
 
     .host-badge {
@@ -222,7 +222,7 @@
 
       <label>Team</label>
       <div class="team-row">
-        <button class="team-btn" data-team="red">🔴 Red Team</button>
+        <button class="team-btn" data-team="green">🟢 Green Team</button>
         <button class="team-btn" data-team="blue">🔵 Blue Team</button>
       </div>
 
@@ -243,7 +243,7 @@
 
 <!-- ── GAME HUD ── -->
 <div id="game-hud" class="hidden">
-  <div class="hud-team hud-team-red">🔴 Red <span class="hud-score" id="score-red">0</span></div>
+  <div class="hud-team hud-team-green">🟢 Green <span class="hud-score" id="score-green">0</span></div>
   <div id="hud-center">
     <span id="hud-phase-label">BUILD</span>
     <span id="hud-timer">30s</span>

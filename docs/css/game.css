@@ -27,7 +27,7 @@
   font-weight: bold;
   min-width: 160px;
 }
-.hud-team-red  { color: #ff6b6b; }
+.hud-team-green { color: #2ecc71; }
 .hud-team-blue { color: #74b9ff; text-align: right; }
 
 .hud-score { font-size: 1.1rem; }
@@ -189,7 +189,7 @@
   line-height: 2;
   margin-bottom: 8px;
 }
-#results-scores .res-red  { color: #ff6b6b; font-weight: bold; }
+#results-scores .res-green { color: #2ecc71; font-weight: bold; }
 #results-scores .res-blue { color: #74b9ff; font-weight: bold; }
 
 #results-finished {

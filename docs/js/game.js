@@ -24,10 +24,11 @@ const RESULTS_TIME     = 8;
 const BUILD_PLACEMENTS = 2;
 
 const CAM_LERP = 0.1; // camera smoothing (lower = smoother/slower)
+const VERSION  = '0.1.19';
 
 const TEAM = {
-  red:  { primary: '#c0392b', light: '#ff6b6b', name: 'Red Team'  },
-  blue: { primary: '#2471a3', light: '#74b9ff', name: 'Blue Team' },
+  green: { primary: '#27ae60', light: '#2ecc71', name: 'Green Team' },
+  blue:  { primary: '#2471a3', light: '#74b9ff', name: 'Blue Team'  },
 };
 
 const OBJ = {
@@ -277,8 +278,8 @@ class GO {
       case 'elevator':        this._dElevator(ctx,x,y,w,h);               break;
       case 'cannon':          this._dCannon(ctx,x,y,w,h);                 break;
       case 'black_hole':      this._dBlackHole(ctx,x,y,w,h);             break;
-      case 'start_zone':      this._dZone(ctx,x,y,w,h,'#2ecc71','START');  break;
-      case 'end_zone':        this._dZone(ctx,x,y,w,h,'#f1c40f','FINISH'); break;
+      case 'start_zone':      this._dZone(ctx,x,y,w,h,'#2ecc71','GRN START','BLU FINISH'); break;
+      case 'end_zone':        this._dZone(ctx,x,y,w,h,'#f1c40f','GRN FINISH','BLU START'); break;
     }
   }
 
@@ -414,12 +415,17 @@ class GO {
     this._label(ctx, x, y, w, h, 'BH');
   }
 
-  _dZone(ctx, x, y, w, h, color, label) {
+  _dZone(ctx, x, y, w, h, color, lnGrn, lnBlu) {
     ctx.fillStyle=color+'28'; ctx.fillRect(x,y,w,h);
     ctx.strokeStyle=color; ctx.lineWidth=2; ctx.setLineDash([6,3]);
     ctx.strokeRect(x+1,y+1,w-2,h-2); ctx.setLineDash([]);
-    ctx.fillStyle=color; ctx.font='bold 11px monospace'; ctx.textAlign='center';
-    ctx.fillText(label, x+w/2, y+h/2+4);
+    ctx.font='bold 9px monospace';
+    const flipped=ctx.getTransform().a<0;
+    const cx=flipped ? -(x+w/2) : x+w/2;
+    ctx.save(); if (flipped) ctx.scale(-1,1); ctx.textAlign='center';
+    ctx.fillStyle=TEAM.green.light; ctx.fillText(lnGrn, cx, y+h/2-3);
+    ctx.fillStyle=TEAM.blue.light;  ctx.fillText(lnBlu, cx, y+h/2+8);
+    ctx.restore();
   }
 
   // Returns current projectile position or null if not in flight
@@ -667,18 +673,21 @@ class Player {
 
     ctx.globalAlpha=1;
 
+    const _flipped=ctx.getTransform().a<0;
+    const _cx=_flipped ? -(x+PW/2) : x+PW/2;
+    ctx.save(); if (_flipped) ctx.scale(-1,1);
     if (this.state==='finished') {
       ctx.fillStyle='#f1c40f'; ctx.font='18px serif'; ctx.textAlign='center';
-      ctx.fillText('★', x+PW/2, y-5);
+      ctx.fillText('★', _cx, y-5);
     }
-
     ctx.font='bold 10px monospace'; ctx.textAlign='center';
     const nm = this.name+(isLocal?' (you)':'');
     const nw = ctx.measureText(nm).width+8;
     ctx.fillStyle='rgba(0,0,0,0.55)';
-    ctx.fillRect(x+PW/2-nw/2, y-20, nw, 14);
+    ctx.fillRect(_cx-nw/2, y-20, nw, 14);
     ctx.fillStyle=tc.light;
-    ctx.fillText(nm, x+PW/2, y-9);
+    ctx.fillText(nm, _cx, y-9);
+    ctx.restore();
 
     if (isLocal) {
       ctx.strokeStyle='#f1c40f'; ctx.lineWidth=2;
@@ -793,7 +802,7 @@ class Renderer {
     c.fillText(`${labels[phase]||''} — ${secs}s`, vw/2, 30);
 
     c.font='bold 16px monospace';
-    c.fillStyle=TEAM.red.light;  c.textAlign='left';  c.fillText(`🔴 ${TEAM.red.name}: ${scores.red}`,  18, 30);
+    c.fillStyle=TEAM.green.light; c.textAlign='left';  c.fillText(`🟢 ${TEAM.green.name}: ${scores.green}`, 18, 30);
     c.fillStyle=TEAM.blue.light; c.textAlign='right'; c.fillText(`${TEAM.blue.name}: ${scores.blue} 🔵`, vw-18, 30);
 
     const pArr=Object.values(players);
@@ -854,7 +863,7 @@ class Renderer {
     c.fillStyle='#f1c40f'; c.font='bold 30px monospace'; c.textAlign='center';
     c.fillText('ROUND OVER', vw/2, by+52);
 
-    ['red','blue'].forEach((t,i) => {
+    ['green','blue'].forEach((t,i) => {
       const tx=bx+40+i*240, tc=TEAM[t];
       c.fillStyle=tc.primary; c.fillRect(tx,by+70,200,120);
       c.fillStyle=tc.light; c.font='bold 16px monospace'; c.textAlign='center';
@@ -898,7 +907,7 @@ class Game {
 
     this.phase    = 'lobby';
     this.timer    = 0;
-    this.scores   = { red:0, blue:0 };
+    this.scores   = { green:0, blue:0 };
     this.round    = 1;
 
     // Viewport & camera (screen-space)
@@ -1030,7 +1039,7 @@ class Game {
     const timerEl=document.getElementById('hud-timer');
     timerEl.textContent=secs+'s';
     timerEl.className=(secs<=10&&this.phase!=='results')?'urgent':'';
-    document.getElementById('score-red').textContent=this.scores.red;
+    document.getElementById('score-green').textContent=this.scores.green;
     document.getElementById('score-blue').textContent=this.scores.blue;
   }
 
@@ -1053,7 +1062,7 @@ class Game {
     if (this.phase==='results') {
       panel.classList.remove('hidden');
       document.getElementById('results-scores').innerHTML=
-        `<span class="res-red">Red: ${this.scores.red}</span>&emsp;<span class="res-blue">Blue: ${this.scores.blue}</span>`;
+        `<span class="res-green">Green: ${this.scores.green}</span>&emsp;<span class="res-blue">Blue: ${this.scores.blue}</span>`;
       const fin=Object.values(this.players).filter(p=>p.state==='finished');
       document.getElementById('results-finished').textContent=
         fin.length ? 'Finished: '+fin.map(p=>p.name).join(', ') : 'Nobody finished!';
@@ -1094,14 +1103,14 @@ class Game {
 
   // ── LOBBY ──
   _setupLobby() {
-    let selectedTeam='red';
+    let selectedTeam='green';
     document.querySelectorAll('.team-btn').forEach(btn => {
       btn.addEventListener('click', ()=>{
         document.querySelectorAll('.team-btn').forEach(b=>b.classList.remove('active'));
         btn.classList.add('active'); selectedTeam=btn.dataset.team;
       });
     });
-    document.querySelector('[data-team="red"]').classList.add('active');
+    document.querySelector('[data-team="green"]').classList.add('active');
 
     document.getElementById('join-btn').addEventListener('click', ()=>{
       const name   = (document.getElementById('player-name').value||'').trim()||'Player';
@@ -1526,6 +1535,11 @@ class Game {
     this.placement.drawGhost(ctx);
 
     ctx.restore();
+
+    // ── Version watermark (screen-space) ──
+    ctx.font='10px monospace'; ctx.textAlign='right';
+    ctx.fillStyle='rgba(255,255,255,0.25)';
+    ctx.fillText('v'+VERSION, vw-8, vh-8);
 
     // ── Screen-space HUD / overlays ──
     if (this.phase==='waiting') r.drawWaitingHUD(this);
