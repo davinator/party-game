@@ -462,6 +462,13 @@ class Level {
   draw(ctx)          { this.objects.forEach(o=>o.draw(ctx)); }
   projectilesAt(t)   { return this.objects.filter(o=>o.type==='cannon').map(o=>o.projectileAt(t)).filter(Boolean); }
   get blackHoles()   { return this.objects.filter(o=>o.type==='black_hole'); }
+  get startZone()    { return this.objects.find(o=>o.type==='start_zone'); }
+
+  endPos() {
+    const ez = this.objects.find(o=>o.isEnd);
+    if (!ez) return { x: WORLD_W - 160, y: 560 };
+    return { x: ez.x + ez.w/2 - PW/2, y: ez.y - PH - 4 };
+  }
 }
 
 // ─────────────────────────────────────────────
@@ -489,27 +496,30 @@ class Player {
   updateLocal(inp, level, placementActive=false) {
     if (this.state==='finished') return null;
 
+    // Blue team's screen is horizontally mirrored — invert left/right
+    const isBlue = this.team === 'blue';
+    const goLeft  = isBlue ? inp.right : inp.left;
+    const goRight = isBlue ? inp.left  : inp.right;
+
     if (this.ghostMode) {
       if (!placementActive) {
         const spd=5;
-        if (inp.left)  this.x-=spd;
-        if (inp.right) this.x+=spd;
-        if (inp.up)    this.y-=spd;
-        if (inp.down)  this.y+=spd;
-        if (inp.left)  this.facing=-1;
-        if (inp.right) this.facing=1;
+        if (goLeft)  { this.x-=spd; this.facing=-1; }
+        if (goRight) { this.x+=spd; this.facing=1;  }
+        if (inp.up)   this.y-=spd;
+        if (inp.down) this.y+=spd;
       }
       this.vx=0; this.vy=0; this.onGround=false;
       return null;
     }
 
-    const { solids, hazards, springs, endZone, blackHoles } = level;
+    const { solids, hazards, springs, endZone, startZone, blackHoles } = level;
 
     // Horizontal
-    if (inp.left)  this.vx -= MOVE_ACCEL;
-    if (inp.right) this.vx += MOVE_ACCEL;
+    if (goLeft)  this.vx -= MOVE_ACCEL;
+    if (goRight) this.vx += MOVE_ACCEL;
     this.vx = clamp(this.vx, -MOVE_MAX, MOVE_MAX);
-    if (!inp.left && !inp.right) {
+    if (!goLeft && !goRight) {
       const onIce = this._riding?.type === 'ice';
       this.vx *= this.onGround ? (onIce ? 0.98 : FRICTION) : AIR_FRIC;
       if (Math.abs(this.vx)<0.08) this.vx=0;
@@ -586,7 +596,8 @@ class Player {
       if (overlap(this.x+3,this.y+3,PW-6,PH-6, hz.x,hz.y,hz.w,hz.h)) return 'died';
     }
     if (this.y>DEATH_Y) return 'died';
-    if (endZone && overlap(this.x,this.y,PW,PH, endZone.x,endZone.y,endZone.w,endZone.h)) return 'finished';
+    const finishZone = isBlue ? startZone : endZone;
+    if (finishZone && overlap(this.x,this.y,PW,PH, finishZone.x,finishZone.y,finishZone.w,finishZone.h)) return 'finished';
 
     return null;
   }
@@ -912,7 +923,11 @@ class Game {
 
   screenToWorld(clientX, clientY) {
     const rect=this.canvas.getBoundingClientRect();
-    return { x:(clientX-rect.left)+this.cam.x, y:(clientY-rect.top)+this.cam.y };
+    const sx=clientX-rect.left, sy=clientY-rect.top;
+    if (this.localPlayer?.team === 'blue') {
+      return { x: WORLD_W - this.cam.x - sx, y: sy + this.cam.y };
+    }
+    return { x: sx + this.cam.x, y: sy + this.cam.y };
   }
 
   _canPlace() {
@@ -1069,7 +1084,9 @@ class Game {
   _updateCamera() {
     const lp = this.localPlayer;
     if (!lp) return;
-    const tx = clamp(lp.x + PW/2 - this.vw/2, 0, Math.max(0, WORLD_W - this.vw));
+    const tx = lp.team === 'blue'
+      ? clamp(WORLD_W - (lp.x + PW/2) - this.vw/2, 0, Math.max(0, WORLD_W - this.vw))
+      : clamp(lp.x + PW/2 - this.vw/2, 0, Math.max(0, WORLD_W - this.vw));
     const ty = clamp(lp.y + PH/2 - this.vh/2, 0, Math.max(0, WORLD_H - this.vh));
     this.cam.x = lerp(this.cam.x, tx, CAM_LERP);
     this.cam.y = lerp(this.cam.y, ty, CAM_LERP);
@@ -1296,13 +1313,20 @@ class Game {
 
   _spawnPlayers() {
     const sp=this.level.startPos();
+    const ep=this.level.endPos();
     // Sort by ID so every client assigns the same spawn slot to the same player
     const pArr=Object.values(this.players).sort((a,b)=>a.id<b.id?-1:1);
-    pArr.forEach((p,i)=>p.spawn(sp.x+i*(PW+20), sp.y));
-    // Point camera immediately at local player (no lerp lag on spawn)
+    let ri=0, bi=0;
+    pArr.forEach(p => {
+      if (p.team==='blue') { p.spawn(ep.x - bi*(PW+20), ep.y); bi++; }
+      else                 { p.spawn(sp.x + ri*(PW+20), sp.y); ri++; }
+    });
     const lp=this.localPlayer;
     if (lp) {
-      this.cam.x = clamp(lp.x+PW/2-this.vw/2, 0, Math.max(0,WORLD_W-this.vw));
+      const tx = lp.team==='blue'
+        ? clamp(WORLD_W-(lp.x+PW/2)-this.vw/2, 0, Math.max(0,WORLD_W-this.vw))
+        : clamp(lp.x+PW/2-this.vw/2, 0, Math.max(0,WORLD_W-this.vw));
+      this.cam.x = tx;
       this.cam.y = clamp(lp.y+PH/2-this.vh/2, 0, Math.max(0,WORLD_H-this.vh));
     }
   }
@@ -1473,7 +1497,13 @@ class Game {
 
     // ── World-space objects ──
     ctx.save();
-    ctx.translate(-Math.round(cam.x), -Math.round(cam.y));
+    const localTeam = this.localPlayer?.team;
+    if (localTeam === 'blue') {
+      ctx.translate(WORLD_W - Math.round(cam.x), -Math.round(cam.y));
+      ctx.scale(-1, 1);
+    } else {
+      ctx.translate(-Math.round(cam.x), -Math.round(cam.y));
+    }
 
     this.level.draw(ctx);
 
