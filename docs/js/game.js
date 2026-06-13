@@ -508,13 +508,11 @@ class Player {
     const goRight = isBlue ? inp.left  : inp.right;
 
     if (this.ghostMode) {
-      if (!placementActive) {
-        const spd=5;
-        if (goLeft)  { this.x-=spd; this.facing=-1; }
-        if (goRight) { this.x+=spd; this.facing=1;  }
-        if (inp.up)   this.y-=spd;
-        if (inp.down) this.y+=spd;
-      }
+      const spd=5;
+      if (goLeft)  { this.x-=spd; this.facing=-1; }
+      if (goRight) { this.x+=spd; this.facing=1;  }
+      if (inp.up)   this.y-=spd;
+      if (inp.down) this.y+=spd;
       this.vx=0; this.vy=0; this.onGround=false;
       return null;
     }
