@@ -221,3 +221,24 @@
   color: #555;
   margin-top: 14px;
 }
+
+/* ── COUNTDOWN MODAL ── */
+#countdown-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0,0,0,0.72);
+  pointer-events: none;
+}
+
+#countdown-number {
+  font-family: 'Courier New', monospace;
+  font-size: 14rem;
+  font-weight: bold;
+  color: #fff;
+  line-height: 1;
+  text-shadow: 0 0 60px rgba(255,255,255,0.4);
+}

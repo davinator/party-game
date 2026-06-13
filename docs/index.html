@@ -200,6 +200,13 @@
     }
 
     #start-btn { display: none; }
+
+    .version-tag {
+      font-size: 0.65rem;
+      color: #444;
+      margin-top: 6px;
+      letter-spacing: 1px;
+    }
   </style>
 </head>
 <body>
@@ -208,6 +215,7 @@
   <div class="panel">
     <h1>PARTY PLATFORMER</h1>
     <p class="subtitle">Multiplayer chaos — die, then make it harder for everyone else</p>
+    <p class="version-tag">v0.1.21</p>
 
     <!-- Connect form -->
     <div id="connect-form">
@@ -260,6 +268,11 @@
     <span id="placements-counter" class="has-placements"></span>
     <span id="build-hint">Click canvas to place</span>
   </div>
+</div>
+
+<!-- ── COUNTDOWN MODAL ── -->
+<div id="countdown-modal" class="hidden">
+  <div id="countdown-number">3</div>
 </div>
 
 <!-- ── RESULTS PANEL ── -->

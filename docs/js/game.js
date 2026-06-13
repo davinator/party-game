@@ -18,13 +18,14 @@ const PW = 26, PH = 40;
 const SNAP = 16;
 const DEATH_Y = WORLD_H + 80;
 
-const BUILD_TIME       = 30;
+const BUILD_TIME       = 60;
+const COUNTDOWN_TIME   = 3;
 const PLAY_TIME        = 120;
 const RESULTS_TIME     = 8;
 const BUILD_PLACEMENTS = 2;
 
 const CAM_LERP = 0.1; // camera smoothing (lower = smoother/slower)
-const VERSION  = '0.1.19';
+const VERSION  = '0.1.21';
 
 const TEAM = {
   green: { primary: '#27ae60', light: '#2ecc71', name: 'Green Team' },
@@ -949,6 +950,15 @@ class Game {
     this.net.broadcast({ type:'phase_change', newPhase:'build', timer:BUILD_TIME });
   }
 
+  _checkAllBuildDone() {
+    if (this.phase!=='build') return;
+    const players=Object.values(this.players);
+    if (players.length>0 && players.every(p=>p._buildDone)) {
+      this._applyPhase('countdown', COUNTDOWN_TIME);
+      this.net.broadcast({ type:'phase_change', newPhase:'countdown', timer:COUNTDOWN_TIME });
+    }
+  }
+
   _initBuildPanel() {
     const grid=document.getElementById('obstacle-grid');
     if (!grid) return;
@@ -987,7 +997,14 @@ class Game {
       const obj=this.placement.build(this.localId);
       this.level.add(obj);
       this.net.broadcast({ type:'place_object', obj });
-      if (this.phase==='build') lp.placementsLeft--;
+      if (this.phase==='build') {
+        lp.placementsLeft--;
+        if (lp.placementsLeft===0) {
+          lp._buildDone=true;
+          this.net.broadcast({ type:'build_done' });
+          if (this.isHost) this._checkAllBuildDone();
+        }
+      }
       this._updateBuildPanel();
     });
   }
@@ -1026,13 +1043,13 @@ class Game {
     const hud=document.getElementById('game-hud');
     const playerBar=document.getElementById('hud-players');
     if (!hud) return;
-    const active=['build','play','results'].includes(this.phase);
+    const active=['build','countdown','play','results'].includes(this.phase);
     hud.classList.toggle('hidden', !active);
     if (playerBar) playerBar.classList.toggle('hidden', !active);
     if (!active) return;
 
     const secs=Math.ceil(this.timer);
-    const label={build:'BUILD',play:'RACE',results:'RESULTS'}[this.phase]||'';
+    const label={build:'BUILD',countdown:'GET READY',play:'RACE',results:'RESULTS'}[this.phase]||'';
     document.getElementById('hud-phase-label').textContent=label;
     const timerEl=document.getElementById('hud-timer');
     timerEl.textContent=secs+'s';
@@ -1071,6 +1088,18 @@ class Game {
       if (!this.isHost) waiting.textContent='Waiting for host to start next round…';
     } else {
       panel.classList.add('hidden');
+    }
+  }
+
+  _updateCountdownModal() {
+    const el=document.getElementById('countdown-modal');
+    if (!el) return;
+    if (this.phase==='countdown') {
+      el.classList.remove('hidden');
+      const n=Math.ceil(this.timer);
+      document.getElementById('countdown-number').textContent = n>0 ? n : 'GO!';
+    } else {
+      el.classList.add('hidden');
     }
   }
 
@@ -1195,6 +1224,11 @@ class Game {
 
     net.on('place_object', msg=>{ this.level.add(msg.obj); });
 
+    net.on('build_done', msg=>{
+      const p=this.players[msg.from]; if (p) p._buildDone=true;
+      if (this.isHost) this._checkAllBuildDone();
+    });
+
     net.on('platform_trigger', msg=>{
       const go = this.level.objects.find(o=>o.id===msg.id);
       if (go && !go._triggered) { go._triggered=true; go._triggerT=msg.t; }
@@ -1272,15 +1306,20 @@ class Game {
       this._enterGame();
       this._spawnPlayers();
       Object.values(this.players).forEach(p=>{
-        p.state='alive'; p.placementsLeft=BUILD_PLACEMENTS; p.ghostMode=true;
+        p.state='alive'; p.placementsLeft=BUILD_PLACEMENTS; p.ghostMode=true; p._buildDone=false;
       });
     }
-    if (phase==='play') {
+    if (phase==='countdown') {
       this._spawnPlayers();
       Object.values(this.players).forEach(p=>{
         p.state='alive'; p.placementsLeft=0; p.ghostMode=false;
       });
       this.placement.close();
+    }
+    if (phase==='play') {
+      Object.values(this.players).forEach(p=>{
+        p.state='alive'; p.ghostMode=false;
+      });
     }
     if (phase==='results') {
       this._tallyScores(); this.placement.close();
@@ -1355,6 +1394,7 @@ class Game {
     this._tick(dt);
     this._updateCamera();
     this._render();
+    this._updateCountdownModal();
     this.input.update();
 
     // Keep waiting-room player list fresh
@@ -1397,6 +1437,9 @@ class Game {
 
     if (this.timer===0 && this.isHost) {
       if (this.phase==='build') {
+        this._applyPhase('countdown', COUNTDOWN_TIME);
+        this.net.broadcast({ type:'phase_change', newPhase:'countdown', timer:COUNTDOWN_TIME });
+      } else if (this.phase==='countdown') {
         this._applyPhase('play', PLAY_TIME);
         this.net.broadcast({ type:'phase_change', newPhase:'play', timer:PLAY_TIME });
       } else if (this.phase==='play') {
@@ -1405,6 +1448,7 @@ class Game {
       }
     }
 
+    if (this.phase==='countdown') return;
     if (this.phase==='results') return;
 
     const lp=this.localPlayer;
