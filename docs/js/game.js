@@ -683,96 +683,40 @@ class Placement {
   constructor() {
     this.active=false; this.type='platform'; this.team=null;
     this.rotation=0;
-    this.cx=0; this.cy=0; // world-space cursor centre
+    this.cx=0; this.cy=0;
   }
 
-  open(team, wx, wy) {
-    this.active=true; this.team=team;
-    this.cx=wx; this.cy=wy;
-    // keep type & rotation from previous placement for convenience
-  }
-  close() { this.active=false; }
-
-  // Cursor grid position (top-left of ghost object)
   get gx() { const d=this._def(); return snap(this.cx - d.w/2); }
   get gy() { const d=this._def(); return snap(this.cy - d.h/2); }
 
   _def() {
-    const base = OBJ[this.type];
-    const rot  = this.rotation;
-    return (rot===90||rot===270)
-      ? { w:base.h, h:base.w }
-      : { w:base.w, h:base.h };
+    const base=OBJ[this.type], rot=this.rotation;
+    return (rot===90||rot===270) ? { w:base.h, h:base.w } : { w:base.w, h:base.h };
   }
 
-  update(inp) {
-    if (!this.active) return;
-    const spd=6;
-    if (inp.left  || inp.k.ArrowLeft)  this.cx -= spd;
-    if (inp.right || inp.k.ArrowRight) this.cx += spd;
-    if (inp.up    || inp.k.ArrowUp)    this.cy -= spd;
-    if (inp.down  || inp.k.ArrowDown)  this.cy += spd;
-    if (inp.pressed('Digit1')) this.type='platform';
-    if (inp.pressed('Digit2')) this.type='spike';
-    if (inp.pressed('Digit3')) this.type='spring';
-    if (inp.pressed('KeyR'))   this.rotation=(this.rotation+90)%360;
-    if (inp.pressed('Escape')) this.close();
-  }
+  updateMouse(wx, wy) { this.cx=wx; this.cy=wy; }
+  rotate() { this.rotation=(this.rotation+90)%360; }
 
   build(placedBy) {
     const def=this._def();
     const base=OBJ[this.type];
-    const extras = base.defaults
-      ? { ...base.defaults, baseX:this.gx, baseY:this.gy }
-      : {};
+    const extras=base.defaults ? { ...base.defaults, baseX:this.gx, baseY:this.gy } : {};
     return { id:uid(), type:this.type,
              x:this.gx, y:this.gy, w:def.w, h:def.h,
-             rotation:this.rotation, team:this.team, placedBy, permanent:false,
-             ...extras };
+             rotation:this.rotation, team:this.team, placedBy, permanent:false, ...extras };
   }
 
-  // Called inside camera transform (world space)
   drawGhost(ctx) {
     if (!this.active) return;
     const def=this._def();
     const base=OBJ[this.type];
-    const extras = base.defaults
-      ? { ...base.defaults, baseX:this.gx, baseY:this.gy }
-      : {};
+    const extras=base.defaults ? { ...base.defaults, baseX:this.gx, baseY:this.gy } : {};
     const ghost=new GO({ id:'g', type:this.type,
                          x:this.gx, y:this.gy, w:def.w, h:def.h,
                          rotation:this.rotation, team:this.team, ...extras });
     ctx.globalAlpha=0.5; ghost.draw(ctx); ctx.globalAlpha=1;
     ctx.strokeStyle='#f1c40f'; ctx.lineWidth=2;
     ctx.strokeRect(this.gx, this.gy, def.w, def.h);
-  }
-
-  // Called in screen space — toolbar at bottom of viewport
-  drawBar(ctx, vw, vh) {
-    if (!this.active) return;
-    const types=Object.keys(OBJ);
-    const bw=150, bh=38, gap=8;
-    const total=types.length*(bw+gap)-gap;
-    const bx0=(vw-total)/2, by=vh-56;
-
-    ctx.fillStyle='rgba(0,0,0,.85)';
-    ctx.fillRect(bx0-12, by-42, total+24, 100);
-    ctx.fillStyle='#f1c40f'; ctx.font='12px monospace'; ctx.textAlign='center';
-    ctx.fillText(
-      `WASD/Arrows to move  ·  [R] Rotate (${this.rotation}°)  ·  [Space] Place  ·  [Esc] Cancel`,
-      vw/2, by-26);
-    ctx.fillStyle='#aaa';
-    ctx.fillText('[1] Platform  [2] Spike  [3] Spring', vw/2, by-10);
-
-    types.forEach((t,i) => {
-      const tx=bx0+i*(bw+gap);
-      const active=t===this.type;
-      ctx.fillStyle=active ? '#f1c40f' : 'rgba(255,255,255,0.1)';
-      ctx.fillRect(tx,by,bw,bh);
-      ctx.fillStyle=active ? '#000' : '#ddd';
-      ctx.font='bold 13px monospace'; ctx.textAlign='center';
-      ctx.fillText(`[${OBJ[t].key}] ${OBJ[t].label}`, tx+bw/2, by+bh/2+5);
-    });
   }
 }
 
@@ -959,9 +903,154 @@ class Game {
     this._resize();
     window.addEventListener('resize', ()=>this._resize());
     this._setupLobby();
+    this._initBuildPanel();
   }
 
   get localPlayer() { return this.players[this.localId]; }
+
+  // ── Mouse-driven placement ──────────────────
+
+  screenToWorld(clientX, clientY) {
+    const rect=this.canvas.getBoundingClientRect();
+    return { x:(clientX-rect.left)+this.cam.x, y:(clientY-rect.top)+this.cam.y };
+  }
+
+  _canPlace() {
+    const lp=this.localPlayer; if (!lp) return false;
+    return (this.phase==='build' && lp.placementsLeft>0) ||
+           (this.phase==='play'  && lp.state==='dead');
+  }
+
+  _startNextRound() {
+    this.round++;
+    this._applyPhase('build', BUILD_TIME);
+    this.net.broadcast({ type:'phase_change', newPhase:'build', timer:BUILD_TIME });
+  }
+
+  _initBuildPanel() {
+    const grid=document.getElementById('obstacle-grid');
+    if (!grid) return;
+    grid.innerHTML='';
+    for (const [type, def] of Object.entries(OBJ)) {
+      const btn=document.createElement('button');
+      btn.className='obs-btn'; btn.dataset.type=type; btn.textContent=def.label;
+      btn.addEventListener('click', ()=>{
+        this.placement.type=type;
+        document.querySelectorAll('.obs-btn').forEach(b=>b.classList.remove('selected'));
+        btn.classList.add('selected');
+      });
+      grid.appendChild(btn);
+    }
+    grid.querySelector('.obs-btn')?.classList.add('selected');
+
+    document.getElementById('rotate-btn')
+      .addEventListener('click', ()=>this.placement.rotate());
+
+    document.getElementById('next-round-btn')
+      .addEventListener('click', ()=>{
+        if (this.isHost && this.phase==='results') this._startNextRound();
+      });
+
+    this.canvas.addEventListener('mousemove', e=>{
+      if (!this.placement.active) return;
+      const w=this.screenToWorld(e.clientX, e.clientY);
+      this.placement.updateMouse(w.x, w.y);
+    });
+
+    this.canvas.addEventListener('click', e=>{
+      if (!this._canPlace()) return;
+      const lp=this.localPlayer; if (!lp) return;
+      const w=this.screenToWorld(e.clientX, e.clientY);
+      this.placement.updateMouse(w.x, w.y);
+      const obj=this.placement.build(this.localId);
+      this.level.add(obj);
+      this.net.broadcast({ type:'place_object', obj });
+      if (this.phase==='build') lp.placementsLeft--;
+      this._updateBuildPanel();
+    });
+  }
+
+  // ── DOM UI updates (called every step) ─────
+
+  _updateBuildPanel() {
+    const canPlace=this._canPlace();
+    this.placement.active=canPlace;
+    const lp=this.localPlayer;
+    if (canPlace && lp) this.placement.team=lp.team;
+
+    const panel=document.getElementById('build-panel');
+    const players=document.getElementById('hud-players');
+    if (!panel) return;
+
+    if (canPlace) {
+      panel.classList.remove('hidden');
+    } else {
+      panel.classList.add('hidden');
+    }
+
+    const counter=document.getElementById('placements-counter');
+    if (counter && lp) {
+      if (this.phase==='build') {
+        counter.textContent=`${lp.placementsLeft} left`;
+        counter.className=lp.placementsLeft>0 ? 'has-placements' : 'no-placements';
+      } else {
+        counter.textContent='∞ placements';
+        counter.className='has-placements';
+      }
+    }
+  }
+
+  _updateHUD() {
+    const hud=document.getElementById('game-hud');
+    const playerBar=document.getElementById('hud-players');
+    if (!hud) return;
+    const active=['build','play','results'].includes(this.phase);
+    hud.classList.toggle('hidden', !active);
+    if (playerBar) playerBar.classList.toggle('hidden', !active);
+    if (!active) return;
+
+    const secs=Math.ceil(this.timer);
+    const label={build:'BUILD',play:'RACE',results:'RESULTS'}[this.phase]||'';
+    document.getElementById('hud-phase-label').textContent=label;
+    const timerEl=document.getElementById('hud-timer');
+    timerEl.textContent=secs+'s';
+    timerEl.className=(secs<=10&&this.phase!=='results')?'urgent':'';
+    document.getElementById('score-red').textContent=this.scores.red;
+    document.getElementById('score-blue').textContent=this.scores.blue;
+  }
+
+  _updatePlayerDots() {
+    const container=document.getElementById('hud-players');
+    if (!container) return;
+    container.innerHTML='';
+    for (const p of Object.values(this.players)) {
+      const div=document.createElement('div');
+      div.className=`hud-player s-${p.state}`;
+      div.style.borderLeftColor=TEAM[p.team]?.primary||'#888';
+      div.innerHTML=`<span class="state-dot"></span>${p.name.slice(0,10)}`;
+      container.appendChild(div);
+    }
+  }
+
+  _updateResultsPanel() {
+    const panel=document.getElementById('results-panel');
+    if (!panel) return;
+    if (this.phase==='results') {
+      panel.classList.remove('hidden');
+      document.getElementById('results-scores').innerHTML=
+        `<span class="res-red">Red: ${this.scores.red}</span>&emsp;<span class="res-blue">Blue: ${this.scores.blue}</span>`;
+      const fin=Object.values(this.players).filter(p=>p.state==='finished');
+      document.getElementById('results-finished').textContent=
+        fin.length ? 'Finished: '+fin.map(p=>p.name).join(', ') : 'Nobody finished!';
+      const btn=document.getElementById('next-round-btn');
+      const waiting=document.getElementById('results-waiting');
+      btn.style.display=this.isHost?'':'none';
+      waiting.style.display=this.isHost?'none':'';
+      if (!this.isHost) waiting.textContent='Waiting for host to start next round…';
+    } else {
+      panel.classList.add('hidden');
+    }
+  }
 
   _resize() {
     const dpr = window.devicePixelRatio || 1;
@@ -1304,7 +1393,7 @@ class Game {
       if (lp.state==='alive') {
         for (const p of this.level.projectilesAt(this._phaseTime)) {
           if (circleRect(p.x,p.y,p.r, lp.x,lp.y,PW,PH)) {
-            lp.state='dead'; lp.ghostMode=true; this.placement.close();
+            lp.state='dead'; lp.ghostMode=true;
             this.net.broadcast({ type:'player_event', playerId:this.localId, event:'died' });
             break;
           }
@@ -1312,11 +1401,11 @@ class Game {
       }
 
       if (evt==='died' && lp.state==='alive') {
-        lp.state='dead'; lp.ghostMode=true; this.placement.close();
+        lp.state='dead'; lp.ghostMode=true;
         this.net.broadcast({ type:'player_event', playerId:this.localId, event:'died' });
       }
       if (evt==='finished' && lp.state==='alive') {
-        lp.state='finished'; lp.ghostMode=false; this.placement.close();
+        lp.state='finished'; lp.ghostMode=false;
         this.net.broadcast({ type:'player_event', playerId:this.localId, event:'finished' });
       }
 
@@ -1333,6 +1422,11 @@ class Game {
     if (this._sendTick%3===0 && lp) {
       this.net.broadcast({ type:'player_update', ...lp.snap() });
     }
+
+    this._updateHUD();
+    this._updateBuildPanel();
+    this._updateResultsPanel();
+    if (this._sendTick%6===0) this._updatePlayerDots();
   }
 
   _resolvePlayerCollisions() {
@@ -1361,31 +1455,12 @@ class Game {
       lp._jbuf=JUMP_BUF;
     }
 
-    if (inp.pressed('KeyE')) {
-      if (!this.placement.active) {
-        const canPlace =
-          (this.phase==='build' && lp.placementsLeft>0) ||
-          (this.phase==='play'  && lp.state==='dead');
-        if (canPlace) this.placement.open(lp.team, lp.x+PW/2, lp.y+PH/2);
-      } else {
-        this.placement.close();
+    if (inp.pressed('KeyR')) {
+      if (this._canPlace()) {
+        this.placement.rotate();
+      } else if (this.isHost && this.phase==='results') {
+        this._startNextRound();
       }
-    }
-
-    this.placement.update(inp);
-
-    if (this.placement.active && inp.pressed('Space')) {
-      const obj=this.placement.build(this.localId);
-      this.level.add(obj);
-      this.net.broadcast({ type:'place_object', obj });
-      this.placement.close();
-      if (this.phase==='build') lp.placementsLeft--;
-    }
-
-    if (this.isHost && this.phase==='results' && inp.pressed('KeyR')) {
-      this.round++;
-      this._applyPhase('build', BUILD_TIME);
-      this.net.broadcast({ type:'phase_change', newPhase:'build', timer:BUILD_TIME });
     }
   }
 
@@ -1423,14 +1498,7 @@ class Game {
     ctx.restore();
 
     // ── Screen-space HUD / overlays ──
-    this.placement.drawBar(ctx, vw, vh);
-    if (this.phase==='waiting') {
-      r.drawWaitingHUD(this);
-    } else {
-      r.drawHUD(this);
-      r.drawDeathPrompt(this);
-      if (this.phase==='results') r.drawResults(this);
-    }
+    if (this.phase==='waiting') r.drawWaitingHUD(this);
   }
 }
 

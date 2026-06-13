@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Party Platformer</title>
+  <link rel="stylesheet" href="css/game.css" />
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -239,6 +240,36 @@
 </div>
 
 <canvas id="canvas"></canvas>
+
+<!-- ── GAME HUD ── -->
+<div id="game-hud" class="hidden">
+  <div class="hud-team hud-team-red">🔴 Red <span class="hud-score" id="score-red">0</span></div>
+  <div id="hud-center">
+    <span id="hud-phase-label">BUILD</span>
+    <span id="hud-timer">30s</span>
+  </div>
+  <div class="hud-team hud-team-blue"><span class="hud-score" id="score-blue">0</span> Blue 🔵</div>
+</div>
+<div id="hud-players" class="hidden"></div>
+
+<!-- ── BUILD PANEL ── -->
+<div id="build-panel" class="hidden">
+  <div id="obstacle-grid"></div>
+  <div id="build-footer">
+    <button id="rotate-btn">↻ Rotate [R]</button>
+    <span id="placements-counter" class="has-placements"></span>
+    <span id="build-hint">Click canvas to place</span>
+  </div>
+</div>
+
+<!-- ── RESULTS PANEL ── -->
+<div id="results-panel" class="hidden">
+  <div id="results-title">ROUND OVER</div>
+  <div id="results-scores"></div>
+  <div id="results-finished"></div>
+  <button id="next-round-btn">▶ Next Round</button>
+  <p id="results-waiting"></p>
+</div>
 
 <script src="js/game.js"></script>
 </body>
