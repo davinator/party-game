@@ -36,7 +36,14 @@ const OBJ = {
   spring:           { w: 48,  h: 16, label: 'Spring',      key: '3' },
   moving_platform:  { w: 128, h: 20, label: 'Moving plat', key: '4',
                       defaults: { rangeX:200, rangeY:0, speed:1.2 } },
+  conveyor:         { w: 128, h: 20, label: 'Conveyor',    key: '5' },
+  ice:              { w: 128, h: 14, label: 'Ice patch',   key: '6' },
+  shock_platform:   { w: 128, h: 20, label: 'Shock plat',  key: '7' },
 };
+
+const CONVEYOR_SPEED = 3.2; // px per tick pushed onto player
+const SHOCK_PERIOD   = 4;   // seconds per shock cycle
+const SHOCK_ACTIVE   = 1;   // seconds the shock is lethal
 
 const PALETTE = [
   '#e74c3c','#e67e22','#f1c40f','#2ecc71',
@@ -154,10 +161,11 @@ class GO {
     this.permanent = !!d.permanent;
     this.placedBy  = d.placedBy || null;
     this.team      = d.team || null;
-    this.solid     = d.type === 'platform' || d.type === 'moving_platform';
+    this.solid     = ['platform','moving_platform','conveyor','ice','shock_platform'].includes(d.type);
     this.hazard    = d.type === 'spike';
     this.isSpring  = d.type === 'spring';
     this.isEnd     = d.type === 'end_zone';
+    this.shocked   = false; // shock_platform active state
     // Moving platform
     this.baseX  = d.baseX  ?? d.x;
     this.baseY  = d.baseY  ?? d.y;
@@ -186,6 +194,9 @@ class GO {
       this._vy = ny - this.y;
       this.x = nx; this.y = ny;
     }
+    if (this.type === 'shock_platform') {
+      this.shocked = (t % SHOCK_PERIOD) > (SHOCK_PERIOD - SHOCK_ACTIVE);
+    }
   }
 
   // Visual dimensions — inverse of the AABB swap applied at creation for 90°/270°
@@ -209,6 +220,9 @@ class GO {
     switch(this.type) {
       case 'platform':        this._dPlat(ctx,x,y,w,h);         break;
       case 'moving_platform': this._dMovingPlat(ctx,x,y,w,h);   break;
+      case 'conveyor':        this._dConveyor(ctx,x,y,w,h);     break;
+      case 'ice':             this._dIce(ctx,x,y,w,h);          break;
+      case 'shock_platform':  this._dShock(ctx,x,y,w,h);        break;
       case 'spike':           this._dSpike(ctx,x,y,w,h);        break;
       case 'spring':          this._dSpring(ctx,x,y,w,h);       break;
       case 'start_zone':      this._dZone(ctx,x,y,w,h,'#2ecc71','START');  break;
@@ -298,6 +312,70 @@ class GO {
     }
   }
 
+  _dConveyor(ctx, x, y, w, h) {
+    const tc = this.team ? TEAM[this.team] : null;
+    const goRight = this.rotation < 90 || this.rotation >= 270;
+    ctx.fillStyle = tc ? tc.primary : '#2d6a4f';
+    ctx.fillRect(x, y+5, w, h-5);
+    ctx.fillStyle = tc ? tc.light : '#52b788';
+    ctx.fillRect(x, y, w, 6);
+    // Animated arrow strip
+    ctx.fillStyle='rgba(255,255,255,0.7)';
+    ctx.font=`bold 13px monospace`; ctx.textAlign='left';
+    const arrow = goRight ? '»' : '«';
+    const step  = 22;
+    for (let ax=x+6; ax<x+w-10; ax+=step) {
+      ctx.fillText(arrow, ax, y+h/2+5);
+    }
+  }
+
+  _dIce(ctx, x, y, w, h) {
+    ctx.fillStyle='#74c0fc';
+    ctx.fillRect(x, y, w, h);
+    ctx.fillStyle='rgba(255,255,255,0.55)';
+    ctx.fillRect(x, y, w, 4);
+    // Shine streaks
+    ctx.strokeStyle='rgba(255,255,255,0.3)'; ctx.lineWidth=1;
+    for (let i=0; i<3; i++) {
+      const sx=x+w*0.2+i*w*0.25;
+      ctx.beginPath(); ctx.moveTo(sx,y+2); ctx.lineTo(sx+12,y+h-2); ctx.stroke();
+    }
+  }
+
+  _dShock(ctx, x, y, w, h) {
+    const tc = this.team ? TEAM[this.team] : null;
+    if (this.shocked) {
+      ctx.fillStyle='#fff176';
+      ctx.fillRect(x, y, w, h);
+      ctx.fillStyle='rgba(255,220,0,0.9)';
+      ctx.fillRect(x, y, w, 5);
+      // Lightning bolts
+      ctx.strokeStyle='#ff6f00'; ctx.lineWidth=2;
+      const bolts = Math.max(2, Math.floor(w/40));
+      for (let i=0;i<bolts;i++) {
+        const bx = x + (i+0.5)*(w/bolts);
+        ctx.beginPath();
+        ctx.moveTo(bx,    y+2);
+        ctx.lineTo(bx-5,  y+h*0.45);
+        ctx.lineTo(bx+3,  y+h*0.45);
+        ctx.lineTo(bx-4,  y+h-2);
+        ctx.stroke();
+      }
+    } else {
+      ctx.fillStyle = tc ? tc.primary : '#37474f';
+      ctx.fillRect(x, y+5, w, h-5);
+      ctx.fillStyle = tc ? tc.light : '#546e7a';
+      ctx.fillRect(x, y, w, 6);
+      // Inactive bolt outline
+      ctx.strokeStyle='rgba(255,220,0,0.35)'; ctx.lineWidth=1.5;
+      const bx=x+w/2;
+      ctx.beginPath();
+      ctx.moveTo(bx,   y+3); ctx.lineTo(bx-4, y+h*0.5);
+      ctx.lineTo(bx+3, y+h*0.5); ctx.lineTo(bx-3, y+h-3);
+      ctx.stroke();
+    }
+  }
+
   _dZone(ctx, x, y, w, h, color, label) {
     ctx.fillStyle=color+'28'; ctx.fillRect(x,y,w,h);
     ctx.strokeStyle=color; ctx.lineWidth=2; ctx.setLineDash([6,3]);
@@ -319,7 +397,7 @@ class Level {
   remove(id)  { this.objects = this.objects.filter(o=>o.id!==id); }
 
   get solids()  { return this.objects.filter(o=>o.solid); }
-  get hazards() { return this.objects.filter(o=>o.hazard); }
+  get hazards() { return this.objects.filter(o=>o.hazard||(o.type==='shock_platform'&&o.shocked)); }
   get springs() { return this.objects.filter(o=>o.isSpring); }
   get endZone() { return this.objects.find(o=>o.isEnd); }
 
@@ -348,6 +426,7 @@ class Player {
     this._coyote=0; this._jbuf=0; this.walk=0;
     this.ghostMode=false;
     this.placementsLeft=0;
+    this._riding=null;
   }
 
   spawn(x,y) {
@@ -380,7 +459,8 @@ class Player {
     if (inp.right) this.vx += MOVE_ACCEL;
     this.vx = clamp(this.vx, -MOVE_MAX, MOVE_MAX);
     if (!inp.left && !inp.right) {
-      this.vx *= this.onGround ? FRICTION : AIR_FRIC;
+      const onIce = this._riding?.type === 'ice';
+      this.vx *= this.onGround ? (onIce ? 0.98 : FRICTION) : AIR_FRIC;
       if (Math.abs(this.vx)<0.08) this.vx=0;
     }
     if (this.vx>0) this.facing=1;
@@ -422,6 +502,12 @@ class Player {
       this.y += riding._vy;
       this._resolveX(solids); // re-check after horizontal carry
     }
+    // Conveyor push
+    if (riding?.type === 'conveyor') {
+      const dir = (riding.rotation === 180) ? -1 : 1;
+      this.vx += dir * CONVEYOR_SPEED;
+      this.vx = clamp(this.vx, -MOVE_MAX * 2, MOVE_MAX * 2);
+    }
 
     // Springs
     for (const s of springs) {
@@ -430,6 +516,7 @@ class Player {
     }
 
     if (this.onGround && Math.abs(this.vx)>0.4) this.walk+=0.28;
+    this._riding = riding;
 
     // Death / finish
     for (const hz of hazards) {
