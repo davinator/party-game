@@ -43,6 +43,7 @@ const OBJ = {
   flip_platform:    { w: 128, h: 20, label: 'Flip plat',   key: '9' },
   elevator:         { w: 80,  h: 20, label: 'Elevator',    key: '0',
                       defaults: { rangeY: 200 } },
+  cannon:           { w: 32,  h: 32, label: 'Cannon',      key: 'q' },
 };
 
 const CONVEYOR_SPEED = 3.2; // px per tick pushed onto player
@@ -53,6 +54,9 @@ const VANISH_RESET   = 3.0; // seconds before platform reappears
 const FLIP_PERIOD    = 3.0; // seconds per flip cycle (half platform, half spikes)
 const ELEV_RISE      = 2.0; // seconds to travel up or down
 const ELEV_WAIT      = 1.0; // seconds to pause at top and bottom
+const CANNON_PERIOD  = 3.0; // seconds between shots
+const CANNON_SPEED   = 7;   // pixels per tick
+const CANNON_RANGE   = 700; // pixels before projectile despawns
 
 const PALETTE = [
   '#e74c3c','#e67e22','#f1c40f','#2ecc71',
@@ -114,6 +118,10 @@ function clamp(v, lo, hi) { return v < lo ? lo : v > hi ? hi : v; }
 function snap(v) { return Math.round(v / SNAP) * SNAP; }
 function overlap(ax,ay,aw,ah, bx,by,bw,bh) {
   return ax < bx+bw && ax+aw > bx && ay < by+bh && ay+ah > by;
+}
+function circleRect(cx,cy,r, rx,ry,rw,rh) {
+  const nx=Math.max(rx,Math.min(cx,rx+rw)), ny=Math.max(ry,Math.min(cy,ry+rh));
+  return (cx-nx)**2+(cy-ny)**2 < r*r;
 }
 
 // ─────────────────────────────────────────────
@@ -263,6 +271,7 @@ class GO {
       case 'disappearing':    this._dDisappearing(ctx,x,y,w,h);            break;
       case 'flip_platform':   this._dFlip(ctx,x,y,w,h);                   break;
       case 'elevator':        this._dElevator(ctx,x,y,w,h);               break;
+      case 'cannon':          this._dCannon(ctx,x,y,w,h);                 break;
       case 'start_zone':      this._dZone(ctx,x,y,w,h,'#2ecc71','START');  break;
       case 'end_zone':        this._dZone(ctx,x,y,w,h,'#f1c40f','FINISH'); break;
     }
@@ -390,12 +399,28 @@ class GO {
     ctx.fillText(text, x+w/2, y+h/2);
   }
 
+  _dCannon(ctx, x, y, w, h) {
+    ctx.fillStyle='#2c3e50'; ctx.fillRect(x, y, w, h);
+    this._label(ctx, x, y, w, h, 'CANNON');
+  }
+
   _dZone(ctx, x, y, w, h, color, label) {
     ctx.fillStyle=color+'28'; ctx.fillRect(x,y,w,h);
     ctx.strokeStyle=color; ctx.lineWidth=2; ctx.setLineDash([6,3]);
     ctx.strokeRect(x+1,y+1,w-2,h-2); ctx.setLineDash([]);
     ctx.fillStyle=color; ctx.font='bold 11px monospace'; ctx.textAlign='center';
     ctx.fillText(label, x+w/2, y+h/2+4);
+  }
+
+  // Returns current projectile position or null if not in flight
+  projectileAt(t) {
+    const tFire = Math.floor(t / CANNON_PERIOD) * CANNON_PERIOD;
+    const dist  = (t - tFire) * CANNON_SPEED * 60;
+    if (dist > CANNON_RANGE) return null;
+    const rad = this.rotation * Math.PI / 180;
+    return { x: this.x + this.w/2 + Math.cos(rad)*dist,
+             y: this.y + this.h/2 + Math.sin(rad)*dist,
+             r: 8 };
   }
 }
 
@@ -421,10 +446,11 @@ class Level {
     return { x: sz.x + sz.w/2 - PW/2, y: sz.y - PH - 4 };
   }
 
-  update(t)   { this.objects.forEach(o=>o.update(t)); }
-  serialize() { return this.objects.filter(o=>!o.permanent).map(o=>o.toJSON()); }
-  load(arr)   { this.reset(); arr.forEach(o=>this.add(o)); }
-  draw(ctx)   { this.objects.forEach(o=>o.draw(ctx)); }
+  update(t)          { this.objects.forEach(o=>o.update(t)); }
+  serialize()        { return this.objects.filter(o=>!o.permanent).map(o=>o.toJSON()); }
+  load(arr)          { this.reset(); arr.forEach(o=>this.add(o)); }
+  draw(ctx)          { this.objects.forEach(o=>o.draw(ctx)); }
+  projectilesAt(t)   { return this.objects.filter(o=>o.type==='cannon').map(o=>o.projectileAt(t)).filter(Boolean); }
 }
 
 // ─────────────────────────────────────────────
@@ -1251,6 +1277,17 @@ class Game {
         this.net.broadcast({ type:'platform_trigger', id:ridingNow.id, t:this._phaseTime });
       }
 
+      // Projectile hits
+      if (lp.state==='alive') {
+        for (const p of this.level.projectilesAt(this._phaseTime)) {
+          if (circleRect(p.x,p.y,p.r, lp.x,lp.y,PW,PH)) {
+            lp.state='dead'; lp.ghostMode=true; this.placement.close();
+            this.net.broadcast({ type:'player_event', playerId:this.localId, event:'died' });
+            break;
+          }
+        }
+      }
+
       if (evt==='died' && lp.state==='alive') {
         lp.state='dead'; lp.ghostMode=true; this.placement.close();
         this.net.broadcast({ type:'player_event', playerId:this.localId, event:'died' });
@@ -1341,6 +1378,14 @@ class Game {
     ctx.translate(-Math.round(cam.x), -Math.round(cam.y));
 
     this.level.draw(ctx);
+
+    // Draw cannon projectiles
+    if (this.phase==='play') {
+      ctx.fillStyle='#e74c3c';
+      for (const p of this.level.projectilesAt(this._phaseTime)) {
+        ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI*2); ctx.fill();
+      }
+    }
 
     const inPlay=this.phase==='play';
     Object.values(this.players)
