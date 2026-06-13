@@ -40,6 +40,7 @@ const OBJ = {
   ice:              { w: 128, h: 14, label: 'Ice patch',   key: '6' },
   shock_platform:   { w: 128, h: 20, label: 'Shock plat',  key: '7' },
   disappearing:     { w: 128, h: 20, label: 'Vanish plat', key: '8' },
+  flip_platform:    { w: 128, h: 20, label: 'Flip plat',   key: '9' },
 };
 
 const CONVEYOR_SPEED = 3.2; // px per tick pushed onto player
@@ -47,6 +48,7 @@ const SHOCK_PERIOD   = 4;   // seconds per shock cycle
 const SHOCK_ACTIVE   = 1;   // seconds the shock is lethal
 const VANISH_DELAY   = 0.7; // seconds after trigger before platform disappears
 const VANISH_RESET   = 3.0; // seconds before platform reappears
+const FLIP_PERIOD    = 3.0; // seconds per flip cycle (half platform, half spikes)
 
 const PALETTE = [
   '#e74c3c','#e67e22','#f1c40f','#2ecc71',
@@ -164,11 +166,12 @@ class GO {
     this.permanent = !!d.permanent;
     this.placedBy  = d.placedBy || null;
     this.team      = d.team || null;
-    this.solid     = ['platform','moving_platform','conveyor','ice','shock_platform','disappearing'].includes(d.type);
+    this.solid     = ['platform','moving_platform','conveyor','ice','shock_platform','disappearing','flip_platform'].includes(d.type);
     this.hazard    = d.type === 'spike';
     this.isSpring  = d.type === 'spring';
     this.isEnd     = d.type === 'end_zone';
     this.shocked      = false; // shock_platform active state
+    this._flipped     = false; // flip_platform: true = spike mode
     this._triggered   = false; // disappearing platform: has been stepped on
     this._triggerT    = 0;
     this._gone        = false; // disappearing platform: currently passable
@@ -202,6 +205,9 @@ class GO {
     }
     if (this.type === 'shock_platform') {
       this.shocked = (t % SHOCK_PERIOD) > (SHOCK_PERIOD - SHOCK_ACTIVE);
+    }
+    if (this.type === 'flip_platform') {
+      this._flipped = Math.floor(t / FLIP_PERIOD) % 2 === 1;
     }
     if (this.type === 'disappearing' && this._triggered) {
       const elapsed = t - this._triggerT;
@@ -238,6 +244,7 @@ class GO {
       case 'spike':           this._dSpike(ctx,x,y,w,h);        break;
       case 'spring':          this._dSpring(ctx,x,y,w,h);       break;
       case 'disappearing':    this._dDisappearing(ctx,x,y,w,h);            break;
+      case 'flip_platform':   this._dFlip(ctx,x,y,w,h);                   break;
       case 'start_zone':      this._dZone(ctx,x,y,w,h,'#2ecc71','START');  break;
       case 'end_zone':        this._dZone(ctx,x,y,w,h,'#f1c40f','FINISH'); break;
     }
@@ -341,6 +348,12 @@ class GO {
     this._label(ctx, x, y, w, h, 'ZAP');
   }
 
+  _dFlip(ctx, x, y, w, h) {
+    ctx.fillStyle = this._flipped ? '#e74c3c' : '#8e44ad';
+    ctx.fillRect(x, y, w, h);
+    this._label(ctx, x, y, w, h, this._flipped ? 'SPIKE' : 'FLIP');
+  }
+
   _dDisappearing(ctx, x, y, w, h) {
     ctx.globalAlpha = this._triggered ? 0.4 : 1;
     ctx.fillStyle = '#a29bfe'; ctx.fillRect(x, y, w, h);
@@ -374,8 +387,8 @@ class Level {
   add(data)   { const o=new GO(data); this.objects.push(o); return o; }
   remove(id)  { this.objects = this.objects.filter(o=>o.id!==id); }
 
-  get solids()  { return this.objects.filter(o=>o.solid && !o._gone); }
-  get hazards() { return this.objects.filter(o=>o.hazard||(o.type==='shock_platform'&&o.shocked)); }
+  get solids()  { return this.objects.filter(o=>o.solid && !o._gone && !(o.type==='flip_platform'&&o._flipped)); }
+  get hazards() { return this.objects.filter(o=>o.hazard||(o.type==='shock_platform'&&o.shocked)||(o.type==='flip_platform'&&o._flipped)); }
   get springs() { return this.objects.filter(o=>o.isSpring); }
   get endZone() { return this.objects.find(o=>o.isEnd); }
 
