@@ -39,11 +39,14 @@ const OBJ = {
   conveyor:         { w: 128, h: 20, label: 'Conveyor',    key: '5' },
   ice:              { w: 128, h: 14, label: 'Ice patch',   key: '6' },
   shock_platform:   { w: 128, h: 20, label: 'Shock plat',  key: '7' },
+  disappearing:     { w: 128, h: 20, label: 'Vanish plat', key: '8' },
 };
 
 const CONVEYOR_SPEED = 3.2; // px per tick pushed onto player
 const SHOCK_PERIOD   = 4;   // seconds per shock cycle
 const SHOCK_ACTIVE   = 1;   // seconds the shock is lethal
+const VANISH_DELAY   = 0.7; // seconds after trigger before platform disappears
+const VANISH_RESET   = 3.0; // seconds before platform reappears
 
 const PALETTE = [
   '#e74c3c','#e67e22','#f1c40f','#2ecc71',
@@ -161,11 +164,14 @@ class GO {
     this.permanent = !!d.permanent;
     this.placedBy  = d.placedBy || null;
     this.team      = d.team || null;
-    this.solid     = ['platform','moving_platform','conveyor','ice','shock_platform'].includes(d.type);
+    this.solid     = ['platform','moving_platform','conveyor','ice','shock_platform','disappearing'].includes(d.type);
     this.hazard    = d.type === 'spike';
     this.isSpring  = d.type === 'spring';
     this.isEnd     = d.type === 'end_zone';
-    this.shocked   = false; // shock_platform active state
+    this.shocked      = false; // shock_platform active state
+    this._triggered   = false; // disappearing platform: has been stepped on
+    this._triggerT    = 0;
+    this._gone        = false; // disappearing platform: currently passable
     // Moving platform
     this.baseX  = d.baseX  ?? d.x;
     this.baseY  = d.baseY  ?? d.y;
@@ -197,6 +203,11 @@ class GO {
     if (this.type === 'shock_platform') {
       this.shocked = (t % SHOCK_PERIOD) > (SHOCK_PERIOD - SHOCK_ACTIVE);
     }
+    if (this.type === 'disappearing' && this._triggered) {
+      const elapsed = t - this._triggerT;
+      this._gone = elapsed >= VANISH_DELAY && elapsed < VANISH_RESET;
+      if (elapsed >= VANISH_RESET) { this._triggered = false; this._gone = false; }
+    }
   }
 
   // Visual dimensions — inverse of the AABB swap applied at creation for 90°/270°
@@ -204,6 +215,7 @@ class GO {
   get vh() { return (this.rotation===90||this.rotation===270) ? this.w : this.h; }
 
   draw(ctx) {
+    if (this._gone) return;
     const rot = this.rotation;
     if (!rot) {
       this._drawAt(ctx, this.x, this.y, this.w, this.h);
@@ -225,6 +237,7 @@ class GO {
       case 'shock_platform':  this._dShock(ctx,x,y,w,h);        break;
       case 'spike':           this._dSpike(ctx,x,y,w,h);        break;
       case 'spring':          this._dSpring(ctx,x,y,w,h);       break;
+      case 'disappearing':    this._dDisappearing(ctx,x,y,w,h);            break;
       case 'start_zone':      this._dZone(ctx,x,y,w,h,'#2ecc71','START');  break;
       case 'end_zone':        this._dZone(ctx,x,y,w,h,'#f1c40f','FINISH'); break;
     }
@@ -328,6 +341,13 @@ class GO {
     this._label(ctx, x, y, w, h, 'ZAP');
   }
 
+  _dDisappearing(ctx, x, y, w, h) {
+    ctx.globalAlpha = this._triggered ? 0.4 : 1;
+    ctx.fillStyle = '#a29bfe'; ctx.fillRect(x, y, w, h);
+    this._label(ctx, x, y, w, h, 'VANISH');
+    ctx.globalAlpha = 1;
+  }
+
   _label(ctx, x, y, w, h, text) {
     ctx.fillStyle='rgba(0,0,0,0.45)'; ctx.font='bold 10px monospace';
     ctx.textAlign='center'; ctx.textBaseline='middle';
@@ -354,7 +374,7 @@ class Level {
   add(data)   { const o=new GO(data); this.objects.push(o); return o; }
   remove(id)  { this.objects = this.objects.filter(o=>o.id!==id); }
 
-  get solids()  { return this.objects.filter(o=>o.solid); }
+  get solids()  { return this.objects.filter(o=>o.solid && !o._gone); }
   get hazards() { return this.objects.filter(o=>o.hazard||(o.type==='shock_platform'&&o.shocked)); }
   get springs() { return this.objects.filter(o=>o.isSpring); }
   get endZone() { return this.objects.find(o=>o.isEnd); }
@@ -977,6 +997,11 @@ class Game {
 
     net.on('place_object', msg=>{ this.level.add(msg.obj); });
 
+    net.on('platform_trigger', msg=>{
+      const go = this.level.objects.find(o=>o.id===msg.id);
+      if (go && !go._triggered) { go._triggered=true; go._triggerT=msg.t; }
+    });
+
     net.on('player_event', msg=>{
       const p=this.players[msg.playerId]; if (!p) return;
       if (msg.event==='died')     { p.state='dead';     p.ghostMode=true;  }
@@ -1182,6 +1207,13 @@ class Game {
       const evt=lp.updateLocal(this.input, this.level, this.placement.active);
 
       this._resolvePlayerCollisions();
+
+      // Trigger disappearing platform on first contact
+      const ridingNow = lp._riding;
+      if (ridingNow?.type === 'disappearing' && !ridingNow._triggered) {
+        ridingNow._triggered = true; ridingNow._triggerT = this._phaseTime;
+        this.net.broadcast({ type:'platform_trigger', id:ridingNow.id, t:this._phaseTime });
+      }
 
       if (evt==='died' && lp.state==='alive') {
         lp.state='dead'; lp.ghostMode=true; this.placement.close();
