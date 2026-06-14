@@ -1081,7 +1081,10 @@ class Game {
     this.scores      = { green:0, blue:0 };
     this.round       = 1;
     this.totalRounds = DEFAULT_ROUNDS;
-    this._deathOrder = [];
+    this._deathOrder  = [];
+    this._mouseActive = false;
+    this._lastCamMx   = 0;
+    this._lastCamMy   = 0;
 
     // Viewport & camera (screen-space)
     this.vw  = window.innerWidth;
@@ -1323,9 +1326,23 @@ class Game {
       return;
     }
 
-    // All game phases: mouse-velocity pan unless a movement key is held, then follow character
+    // Mouse-active flag: set when mouse moves, cleared when player moves character.
+    // This prevents the camera snapping back to mouse-pan the instant you stop moving.
+    const mouseMoved = this.input.mx !== this._lastCamMx || this.input.my !== this._lastCamMy;
+    this._lastCamMx = this.input.mx;
+    this._lastCamMy = this.input.my;
+    if (mouseMoved) this._mouseActive = true;
+
     const isMoving = this.input.left || this.input.right;
-    if (isMoving) {
+    if (isMoving) this._mouseActive = false;
+
+    if (this._mouseActive) {
+      const PAN_MAX = 10;
+      const panX = ((this.input.mx - this.vw/2) / (this.vw/2)) * PAN_MAX;
+      const panY = ((this.input.my - this.vh/2) / (this.vh/2)) * PAN_MAX;
+      this.cam.x = clamp(this.cam.x + panX, 0, Math.max(0, WORLD_W - VW));
+      this.cam.y = clamp(this.cam.y + panY, 0, Math.max(0, WORLD_H - VH));
+    } else {
       const mirrorBlue = lp.team === 'blue';
       const tx = mirrorBlue
         ? clamp(WORLD_W - (lp.x + PW/2) - VW/2, 0, Math.max(0, WORLD_W - VW))
@@ -1333,12 +1350,6 @@ class Game {
       const ty = clamp(lp.y + PH/2 - VH/2, 0, Math.max(0, WORLD_H - VH));
       this.cam.x = lerp(this.cam.x, tx, CAM_LERP);
       this.cam.y = lerp(this.cam.y, ty, CAM_LERP);
-    } else {
-      const PAN_MAX = 10;
-      const panX = ((this.input.mx - this.vw/2) / (this.vw/2)) * PAN_MAX;
-      const panY = ((this.input.my - this.vh/2) / (this.vh/2)) * PAN_MAX;
-      this.cam.x = clamp(this.cam.x + panX, 0, Math.max(0, WORLD_W - VW));
-      this.cam.y = clamp(this.cam.y + panY, 0, Math.max(0, WORLD_H - VH));
     }
   }
 
