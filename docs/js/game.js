@@ -23,7 +23,7 @@ const BUILD_TIME       = 60;
 const COUNTDOWN_TIME   = 3;
 const PLAY_TIME        = 120;
 const RESULTS_TIME     = 8;
-const BUILD_PLACEMENTS = 2;
+const DEFAULT_ROUNDS   = 6;
 
 const CAM_LERP = 0.1; // camera smoothing (lower = smoother/slower)
 const VERSION  = '0.1.36';
@@ -1085,10 +1085,12 @@ class Game {
     this.localId  = null;
     this.isHost   = false;
 
-    this.phase    = 'lobby';
-    this.timer    = 0;
-    this.scores   = { green:0, blue:0 };
-    this.round    = 1;
+    this.phase       = 'lobby';
+    this.timer       = 0;
+    this.scores      = { green:0, blue:0 };
+    this.round       = 1;
+    this.totalRounds = DEFAULT_ROUNDS;
+    this._deathOrder = [];
 
     // Viewport & camera (screen-space)
     this.vw  = window.innerWidth;
@@ -1128,9 +1130,19 @@ class Game {
   }
 
   _startNextRound() {
-    this.round++;
-    this._applyPhase('build', BUILD_TIME);
-    this.net.broadcast({ type:'phase_change', newPhase:'build', timer:BUILD_TIME });
+    if (this.round >= this.totalRounds) {
+      this._applyPhase('gameover', 0);
+      this.net.broadcast({ type:'phase_change', newPhase:'gameover', timer:0 });
+    } else {
+      this.round++;
+      this._applyPhase('build', BUILD_TIME);
+      this.net.broadcast({ type:'phase_change', newPhase:'build', timer:BUILD_TIME, round:this.round });
+    }
+  }
+
+  _returnToWaiting() {
+    this._applyPhase('waiting', 0);
+    this.net.broadcast({ type:'phase_change', newPhase:'waiting', timer:0 });
   }
 
   _checkAllBuildDone() {
@@ -1163,7 +1175,8 @@ class Game {
 
     document.getElementById('next-round-btn')
       .addEventListener('click', ()=>{
-        if (this.isHost && this.phase==='results') this._startNextRound();
+        if (this.isHost && this.phase==='results')  this._startNextRound();
+        if (this.isHost && this.phase==='gameover') this._returnToWaiting();
       });
 
     this.canvas.addEventListener('mousemove', e=>{
@@ -1226,13 +1239,14 @@ class Game {
     const hud=document.getElementById('game-hud');
     const playerBar=document.getElementById('hud-players');
     if (!hud) return;
-    const active=['build','countdown','play','results'].includes(this.phase);
+    const active=['build','countdown','play','results','gameover'].includes(this.phase);
     hud.classList.toggle('hidden', !active);
     if (playerBar) playerBar.classList.toggle('hidden', !active);
     if (!active) return;
 
     const secs=Math.ceil(this.timer);
-    const label={build:'BUILD',countdown:'GET READY',play:'RACE',results:'RESULTS'}[this.phase]||'';
+    const rt=`${this.round}/${this.totalRounds}`;
+    const label={build:`BUILD · ${rt}`,countdown:'GET READY',play:`RACE · ${rt}`,results:`RESULTS · ${rt}`,gameover:'GAME OVER'}[this.phase]||'';
     document.getElementById('hud-phase-label').textContent=label;
     const timerEl=document.getElementById('hud-timer');
     timerEl.textContent=secs+'s';
@@ -1257,18 +1271,23 @@ class Game {
   _updateResultsPanel() {
     const panel=document.getElementById('results-panel');
     if (!panel) return;
-    if (this.phase==='results') {
+    if (this.phase==='results' || this.phase==='gameover') {
       panel.classList.remove('hidden');
+      const isGameOver = this.phase==='gameover';
+      document.getElementById('results-title').textContent =
+        isGameOver ? 'GAME OVER' : `ROUND ${this.round} / ${this.totalRounds}`;
       document.getElementById('results-scores').innerHTML=
         `<span class="res-green">Green: ${this.scores.green}</span>&emsp;<span class="res-blue">Blue: ${this.scores.blue}</span>`;
       const fin=Object.values(this.players).filter(p=>p.state==='finished');
       document.getElementById('results-finished').textContent=
-        fin.length ? 'Finished: '+fin.map(p=>p.name).join(', ') : 'Nobody finished!';
+        isGameOver ? (this.scores.green>this.scores.blue?'Green wins!':this.scores.blue>this.scores.green?'Blue wins!':'It\'s a tie!')
+                   : (fin.length ? 'Finished: '+fin.map(p=>p.name).join(', ') : 'Nobody finished!');
       const btn=document.getElementById('next-round-btn');
       const waiting=document.getElementById('results-waiting');
+      btn.textContent = isGameOver ? '↩ Return to Lobby' : '▶ Next Round';
       btn.style.display=this.isHost?'':'none';
       waiting.style.display=this.isHost?'none':'';
-      if (!this.isHost) waiting.textContent='Waiting for host to start next round…';
+      waiting.textContent = isGameOver ? 'Waiting for host to return to lobby…' : 'Waiting for host to start next round…';
     } else {
       panel.classList.add('hidden');
     }
@@ -1321,7 +1340,8 @@ class Game {
       return;
     }
 
-    const tx = lp.team === 'blue'
+    const mirrorBlue = lp.team === 'blue' && this.phase !== 'waiting';
+    const tx = mirrorBlue
       ? clamp(WORLD_W - (lp.x + PW/2) - VW/2, 0, Math.max(0, WORLD_W - VW))
       : clamp(lp.x + PW/2 - VW/2, 0, Math.max(0, WORLD_W - VW));
     const ty = clamp(lp.y + PH/2 - VH/2, 0, Math.max(0, WORLD_H - VH));
@@ -1386,7 +1406,7 @@ class Game {
 
     net.on('state_sync', msg=>{
       if (msg.to!==this.localId) return;
-      this.scores=msg.scores; this.round=msg.round;
+      this.scores=msg.scores; this.round=msg.round; this.totalRounds=msg.totalRounds||DEFAULT_ROUNDS;
       msg.players.forEach(p=>{
         if (p.id!==this.localId) this._addPlayer(p.id,p.name,p.team,p.colorIdx);
         const pl=this.players[p.id];
@@ -1410,12 +1430,15 @@ class Game {
       net.sendTo(msg.targetPlayerId, {
         type:'state_sync', to:msg.targetPlayerId,
         objects:this.level.serialize(), phase:this.phase, timer:this.timer,
-        scores:this.scores, round:this.round, players:pArr,
+        scores:this.scores, round:this.round, totalRounds:this.totalRounds, players:pArr,
       });
     });
 
     net.on('phase_change', msg=>{
       if (msg.from===this.localId) return;
+      if (msg.round       !== undefined) this.round       = msg.round;
+      if (msg.totalRounds !== undefined) this.totalRounds = msg.totalRounds;
+      if (msg.scores      !== undefined) this.scores      = msg.scores;
       this._applyPhase(msg.newPhase, msg.timer);
     });
 
@@ -1438,7 +1461,10 @@ class Game {
 
     net.on('player_event', msg=>{
       const p=this.players[msg.playerId]; if (!p) return;
-      if (msg.event==='died')     { p.state='dead';     p.ghostMode=true;  }
+      if (msg.event==='died') {
+        p.state='dead'; p.ghostMode=true;
+        if (this.phase==='play') this._deathOrder.push(msg.playerId);
+      }
       if (msg.event==='finished') { p.state='finished'; p.ghostMode=false; }
     });
 
@@ -1500,24 +1526,41 @@ class Game {
     const cnt = Object.keys(this.players).length;
     const msg = document.getElementById('status-msg');
     if (msg) msg.textContent = `Room: ${this.roomId||'?'}  ·  ${cnt} player${cnt!==1?'s':''}`;
+    const cfg = document.getElementById('host-config');
+    if (cfg) cfg.style.display = this.isHost ? '' : 'none';
   }
 
   // ── PHASES ──
   _hostStartBuild() {
+    const el = document.getElementById('rounds-count');
+    this.totalRounds = el ? Math.max(1, parseInt(el.value)||DEFAULT_ROUNDS) : DEFAULT_ROUNDS;
+    this.round = 1;
+    this.scores = { green:0, blue:0 };
+    this._deathOrder = [];
     this._applyPhase('build', BUILD_TIME);
-    this.net.broadcast({ type:'phase_change', newPhase:'build', timer:BUILD_TIME });
+    this.net.broadcast({ type:'phase_change', newPhase:'build', timer:BUILD_TIME,
+      round:1, totalRounds:this.totalRounds, scores:this.scores });
   }
 
   _applyPhase(phase, timer) {
     this.phase=phase; this.timer=timer; this._phaseTime=0;
 
+    if (phase==='waiting') { this._enterWaiting(); return; }
+
     if (phase==='build') {
-      this.level.reset();
+      if (this.round===1) this.level.reset(); // only on new-game first round
       this._enterGame();
       this._spawnPlayers();
       this._buildCamX = this.cam.x;
+      const n = Object.keys(this.players).length;
+      const base = n > 6 ? 1 : 2;
+      const bonusCount = n > 6 ? Math.floor(n * 0.3) : 0;
+      const bonusSet = new Set(this._deathOrder.slice(0, bonusCount));
+      this._deathOrder = [];
       Object.values(this.players).forEach(p=>{
-        p.state='alive'; p.placementsLeft=BUILD_PLACEMENTS; p.ghostMode=true; p._buildDone=false;
+        p.state='alive';
+        p.placementsLeft = base + (bonusSet.has(p.id) ? 1 : 0);
+        p.ghostMode=true; p._buildDone=false;
       });
     }
     if (phase==='countdown') {
@@ -1536,21 +1579,24 @@ class Game {
       this._tallyScores(); this.placement.close();
       Object.values(this.players).forEach(p=>{ p.ghostMode=false; });
     }
+    if (phase==='gameover') {
+      this.placement.close();
+    }
   }
 
   _enterWaiting() {
     this.phase = 'waiting';
     this.level.objects = WAITING_LEVEL.map(o => new GO({...o}));
-    // Spawn local player near the left side
     const lp = this.localPlayer;
     if (lp) {
       lp.spawn(300, 580);
       this.cam.x = 0; this.cam.y = 0;
     }
-    // Show canvas, shrink overlay to corner panel
     this.canvas.style.display = 'block';
     const ov = document.getElementById('overlay');
+    ov.style.display = ''; // restore if hidden by _enterGame
     ov.classList.add('compact');
+    this._refreshWaitingPanel();
     if (!this._loopStarted) {
       this._loopStarted = true;
       requestAnimationFrame(ts => this._loop(ts));
@@ -1665,7 +1711,8 @@ class Game {
     }
 
     if (this.phase==='countdown') return;
-    if (this.phase==='results') return;
+    if (this.phase==='results')   return;
+    if (this.phase==='gameover')  return;
 
     const lp=this.localPlayer;
     if (lp) {
@@ -1686,6 +1733,7 @@ class Game {
           if (circleRect(p.x,p.y,p.r, lp.x,lp.y,PW,PH)) {
             lp.state='dead'; lp.ghostMode=true;
             this.net.broadcast({ type:'player_event', playerId:this.localId, event:'died' });
+            this._deathOrder.push(this.localId);
             break;
           }
         }
@@ -1694,6 +1742,7 @@ class Game {
       if (evt==='died' && lp.state==='alive') {
         lp.state='dead'; lp.ghostMode=true;
         this.net.broadcast({ type:'player_event', playerId:this.localId, event:'died' });
+        this._deathOrder.push(this.localId);
       }
       if (evt==='finished' && lp.state==='alive') {
         lp.state='finished'; lp.ghostMode=false;
@@ -1783,6 +1832,8 @@ class Game {
         this.placement.rotate();
       } else if (this.isHost && this.phase==='results') {
         this._startNextRound();
+      } else if (this.isHost && this.phase==='gameover') {
+        this._returnToWaiting();
       }
     }
   }
@@ -1798,7 +1849,7 @@ class Game {
     ctx.save();
     const localTeam = this.localPlayer?.team;
     ctx.scale(ZOOM, ZOOM);
-    if (localTeam === 'blue') {
+    if (localTeam === 'blue' && this.phase !== 'waiting') {
       ctx.translate(WORLD_W - cam.x, -cam.y);
       ctx.scale(-1, 1);
     } else {

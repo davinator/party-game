@@ -229,7 +229,7 @@
   <div class="panel">
     <h1>PARTY PLATFORMER</h1>
     <p class="subtitle">Multiplayer chaos — die, then make it harder for everyone else</p>
-    <p class="version-tag">v0.1.37</p>
+    <p class="version-tag">v0.1.38</p>
 
     <!-- Connect form -->
     <div id="connect-form">
@@ -256,6 +256,11 @@
       <p class="waiting-header">Waiting in lobby…</p>
       <ul id="player-list"></ul>
       <p id="status-msg">Share the room code with friends!</p>
+      <div id="host-config" style="display:none; margin-top:10px;">
+        <label style="font-size:0.72rem;color:#aaa;text-align:left;display:block;margin-bottom:4px;">Rounds</label>
+        <input type="number" id="rounds-count" min="1" max="20" value="6"
+          style="width:100%;padding:7px 10px;background:rgba(255,255,255,0.08);border:1px solid #444;border-radius:4px;color:#fff;font-family:inherit;font-size:0.9rem;outline:none;" />
+      </div>
       <button class="primary-btn green-btn" id="start-btn">▶ START GAME (host only)</button>
     </div>
   </div>
