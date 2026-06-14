@@ -25,7 +25,7 @@ const RESULTS_TIME     = 8;
 const BUILD_PLACEMENTS = 2;
 
 const CAM_LERP = 0.1; // camera smoothing (lower = smoother/slower)
-const VERSION  = '0.1.22';
+const VERSION  = '0.1.23';
 
 const TEAM = {
   green: { primary: '#27ae60', light: '#2ecc71', name: 'Green Team' },
@@ -132,6 +132,54 @@ function circleRect(cx,cy,r, rx,ry,rw,rh) {
 
 // ─────────────────────────────────────────────
 //  INPUT  (screen-space mouse coords; camera offset applied by caller)
+// ─────────────────────────────────────────────
+// ─────────────────────────────────────────────
+//  SPRITE LOADER
+// ─────────────────────────────────────────────
+class SpriteLoader {
+  constructor() { this._imgs = {}; this._defs = {}; }
+
+  load(path) {
+    fetch(path)
+      .then(r => r.ok ? r.json() : null)
+      .then(manifest => {
+        if (!manifest) return;
+        this._defs = manifest;
+        for (const [name, def] of Object.entries(manifest)) {
+          if (!def.src) continue;
+          const img = new Image();
+          img.onload = () => { this._imgs[name] = img; };
+          img.src = def.src;
+        }
+      })
+      .catch(() => {}); // manifest absent — all shapes, no crash
+  }
+
+  // Returns true if drawn; false = caller renders its own fallback
+  draw(ctx, name, anim, x, y, w, h, flipX = false) {
+    const img = this._imgs[name];
+    const def = this._defs[name];
+    if (!img || !def) return false;
+    const a = def.anims?.[anim] ?? def.anims?.idle;
+    if (!a) return false;
+    const frame = a.frames > 1
+      ? Math.floor(performance.now() / 1000 * a.fps) % a.frames
+      : 0;
+    const sx = frame * def.fw, sy = (a.row ?? 0) * def.fh;
+    if (flipX) {
+      ctx.save();
+      ctx.translate(x + w, y); ctx.scale(-1, 1);
+      ctx.drawImage(img, sx, sy, def.fw, def.fh, 0, 0, w, h);
+      ctx.restore();
+    } else {
+      ctx.drawImage(img, sx, sy, def.fw, def.fh, x, y, w, h);
+    }
+    return true;
+  }
+}
+
+const sprites = new SpriteLoader();
+
 // ─────────────────────────────────────────────
 class Input {
   constructor(canvas) {
@@ -265,7 +313,20 @@ class GO {
     }
   }
 
+  _spriteAnim() {
+    switch (this.type) {
+      case 'shock_platform': return this.shocked   ? 'shocked'  : 'idle';
+      case 'flip_platform':  return this._flipped  ? 'flipped'  : 'idle';
+      case 'disappearing':   return this._gone     ? 'gone'     : this._triggered ? 'warning' : 'idle';
+      case 'elevator':       return this._triggered ? 'moving'  : 'idle';
+      case 'conveyor':       return this.rotation===180 ? 'roll_rev' : 'roll';
+      case 'black_hole':     return 'spin';
+      default:               return 'idle';
+    }
+  }
+
   _drawAt(ctx, x, y, w, h) {
+    if (sprites.draw(ctx, this.type, this._spriteAnim(), x, y, w, h)) return;
     switch(this.type) {
       case 'platform':        this._dPlat(ctx,x,y,w,h);         break;
       case 'moving_platform': this._dMovingPlat(ctx,x,y,w,h);   break;
@@ -643,29 +704,32 @@ class Player {
     const tc=TEAM[this.team];
     ctx.globalAlpha = asGhost ? 0.38 : 1;
 
-    if (!this.ghostMode) {
-      ctx.fillStyle='rgba(0,0,0,0.25)';
-      ctx.fillRect(x+3, y+PH+1, PW-6, 4);
-    }
+    const _anim = this.ghostMode          ? 'ghost'
+      : this.state === 'finished'         ? 'finished'
+      : !this.onGround                    ? (this.vy < 0 ? 'jump' : 'fall')
+      : Math.abs(this.vx) > 0.5          ? 'walk' : 'idle';
 
-    ctx.fillStyle=tc.primary; ctx.fillRect(x,y,PW,PH);
-    ctx.fillStyle=tc.light;   ctx.fillRect(x+2,y+2,PW-4,10);
-
-    const ex = this.facing>0 ? x+PW-10 : x+3;
-    ctx.fillStyle='#fff'; ctx.fillRect(ex,y+5,6,6);
-    ctx.fillStyle='#111'; ctx.fillRect(ex+(this.facing>0?2:0),y+6,4,4);
-
-    if (this.onGround && !this.ghostMode) {
-      const sw=Math.sin(this.walk)*5;
-      ctx.fillStyle=tc.primary;
-      ctx.fillRect(x+3,    y+PH-6, 8, 6+sw);
-      ctx.fillRect(x+PW-11,y+PH-6, 8, 6-sw);
-    }
-
-    if (this.ghostMode) {
-      ctx.globalAlpha=0.18;
-      ctx.fillStyle=tc.light;
-      ctx.fillRect(x-4,y-4,PW+8,PH+8);
+    if (!sprites.draw(ctx, `player_${this.team}`, _anim, x, y, PW, PH, this.facing < 0)) {
+      if (!this.ghostMode) {
+        ctx.fillStyle='rgba(0,0,0,0.25)';
+        ctx.fillRect(x+3, y+PH+1, PW-6, 4);
+      }
+      ctx.fillStyle=tc.primary; ctx.fillRect(x,y,PW,PH);
+      ctx.fillStyle=tc.light;   ctx.fillRect(x+2,y+2,PW-4,10);
+      const ex = this.facing>0 ? x+PW-10 : x+3;
+      ctx.fillStyle='#fff'; ctx.fillRect(ex,y+5,6,6);
+      ctx.fillStyle='#111'; ctx.fillRect(ex+(this.facing>0?2:0),y+6,4,4);
+      if (this.onGround && !this.ghostMode) {
+        const sw=Math.sin(this.walk)*5;
+        ctx.fillStyle=tc.primary;
+        ctx.fillRect(x+3,    y+PH-6, 8, 6+sw);
+        ctx.fillRect(x+PW-11,y+PH-6, 8, 6-sw);
+      }
+      if (this.ghostMode) {
+        ctx.globalAlpha=0.18;
+        ctx.fillStyle=tc.light;
+        ctx.fillRect(x-4,y-4,PW+8,PH+8);
+      }
     }
 
     ctx.globalAlpha=1;
@@ -771,18 +835,29 @@ class Renderer {
   // Background fills the canvas (screen space, called before camera transform)
   clear(vw, vh, camX) {
     const c=this.ctx;
-    const g=c.createLinearGradient(0,0,0,vh);
-    g.addColorStop(0,'#0d0d1a'); g.addColorStop(1,'#131328');
-    c.fillStyle=g; c.fillRect(0,0,vw,vh);
-    // Parallax stars — offset slowly with camera
-    c.fillStyle='rgba(255,255,255,0.45)';
-    const sx = camX * 0.08; // parallax factor
-    for (let i=0;i<80;i++) {
-      const px = ((i*173.7 - sx) % vw + vw) % vw;
-      const py = (i*97.3) % (vh*0.75);
-      c.fillRect(px|0, py|0, 1, 1);
+    const bgImg = sprites._imgs['background'];
+    if (bgImg) {
+      // Tile background horizontally with slow parallax
+      const bw = bgImg.width, bh = bgImg.height;
+      const scale = vh / bh;
+      const dw = bw * scale; // drawn width per tile
+      const offset = (camX * 0.15) % dw;
+      const startX = -(offset + dw) % dw;
+      for (let tx = startX; tx < vw; tx += dw) {
+        c.drawImage(bgImg, 0, 0, bw, bh, tx, 0, dw, vh);
+      }
+    } else {
+      const g=c.createLinearGradient(0,0,0,vh);
+      g.addColorStop(0,'#0d0d1a'); g.addColorStop(1,'#131328');
+      c.fillStyle=g; c.fillRect(0,0,vw,vh);
+      c.fillStyle='rgba(255,255,255,0.45)';
+      const sx = camX * 0.08;
+      for (let i=0;i<80;i++) {
+        const px = ((i*173.7 - sx) % vw + vw) % vw;
+        const py = (i*97.3) % (vh*0.75);
+        c.fillRect(px|0, py|0, 1, 1);
+      }
     }
-    // Death-zone gradient hint (world-space-ish, always at screen bottom)
     c.fillStyle='rgba(200,0,0,0.07)';
     c.fillRect(0, vh-40, vw, 40);
   }
@@ -917,6 +992,8 @@ class Game {
     this._acc         = 0;
     this._phaseTime   = 0; // seconds since phase start — drives deterministic dynamic objects
     this._loopStarted = false;
+
+    sprites.load('sprites/manifest.json');
 
     this._resize();
     window.addEventListener('resize', ()=>this._resize());

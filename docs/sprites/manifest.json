@@ -1,0 +1,126 @@
+{
+  "player_green": {
+    "src": "sprites/player_green.png",
+    "fw": 26, "fh": 40,
+    "anims": {
+      "idle":     { "row": 0, "frames": 1, "fps": 1  },
+      "walk":     { "row": 1, "frames": 4, "fps": 10 },
+      "jump":     { "row": 2, "frames": 1, "fps": 1  },
+      "fall":     { "row": 3, "frames": 1, "fps": 1  },
+      "ghost":    { "row": 4, "frames": 4, "fps": 6  },
+      "finished": { "row": 5, "frames": 4, "fps": 6  }
+    }
+  },
+  "player_blue": {
+    "src": "sprites/player_blue.png",
+    "fw": 26, "fh": 40,
+    "anims": {
+      "idle":     { "row": 0, "frames": 1, "fps": 1  },
+      "walk":     { "row": 1, "frames": 4, "fps": 10 },
+      "jump":     { "row": 2, "frames": 1, "fps": 1  },
+      "fall":     { "row": 3, "frames": 1, "fps": 1  },
+      "ghost":    { "row": 4, "frames": 4, "fps": 6  },
+      "finished": { "row": 5, "frames": 4, "fps": 6  }
+    }
+  },
+
+  "platform": {
+    "src": "sprites/platform.png",
+    "fw": 128, "fh": 20,
+    "anims": { "idle": { "row": 0, "frames": 1, "fps": 1 } }
+  },
+  "moving_platform": {
+    "src": "sprites/moving_platform.png",
+    "fw": 128, "fh": 20,
+    "anims": { "idle": { "row": 0, "frames": 1, "fps": 1 } }
+  },
+  "conveyor": {
+    "src": "sprites/conveyor.png",
+    "fw": 128, "fh": 20,
+    "anims": {
+      "roll":     { "row": 0, "frames": 4, "fps": 8 },
+      "roll_rev": { "row": 1, "frames": 4, "fps": 8 }
+    }
+  },
+  "ice": {
+    "src": "sprites/ice.png",
+    "fw": 128, "fh": 14,
+    "anims": { "idle": { "row": 0, "frames": 1, "fps": 1 } }
+  },
+  "shock_platform": {
+    "src": "sprites/shock_platform.png",
+    "fw": 128, "fh": 20,
+    "anims": {
+      "idle":    { "row": 0, "frames": 1, "fps": 1  },
+      "shocked": { "row": 1, "frames": 4, "fps": 12 }
+    }
+  },
+  "disappearing": {
+    "src": "sprites/disappearing.png",
+    "fw": 128, "fh": 20,
+    "anims": {
+      "idle":    { "row": 0, "frames": 1, "fps": 1  },
+      "warning": { "row": 1, "frames": 4, "fps": 10 },
+      "gone":    { "row": 2, "frames": 1, "fps": 1  }
+    }
+  },
+  "flip_platform": {
+    "src": "sprites/flip_platform.png",
+    "fw": 128, "fh": 20,
+    "anims": {
+      "idle":    { "row": 0, "frames": 1, "fps": 1 },
+      "flipped": { "row": 1, "frames": 1, "fps": 1 }
+    }
+  },
+  "elevator": {
+    "src": "sprites/elevator.png",
+    "fw": 80, "fh": 20,
+    "anims": {
+      "idle":   { "row": 0, "frames": 1, "fps": 1 },
+      "moving": { "row": 1, "frames": 4, "fps": 8 }
+    }
+  },
+  "spike": {
+    "src": "sprites/spike.png",
+    "fw": 32, "fh": 24,
+    "anims": { "idle": { "row": 0, "frames": 1, "fps": 1 } }
+  },
+  "spring": {
+    "src": "sprites/spring.png",
+    "fw": 48, "fh": 16,
+    "anims": {
+      "idle":      { "row": 0, "frames": 1, "fps": 1  },
+      "triggered": { "row": 1, "frames": 3, "fps": 12 }
+    }
+  },
+  "cannon": {
+    "src": "sprites/cannon.png",
+    "fw": 32, "fh": 32,
+    "anims": {
+      "idle": { "row": 0, "frames": 1, "fps": 1  },
+      "fire": { "row": 1, "frames": 4, "fps": 12 }
+    }
+  },
+  "black_hole": {
+    "src": "sprites/black_hole.png",
+    "fw": 40, "fh": 40,
+    "anims": {
+      "spin": { "row": 0, "frames": 8, "fps": 12 }
+    }
+  },
+  "start_zone": {
+    "src": "sprites/start_zone.png",
+    "fw": 190, "fh": 30,
+    "anims": { "idle": { "row": 0, "frames": 1, "fps": 1 } }
+  },
+  "end_zone": {
+    "src": "sprites/end_zone.png",
+    "fw": 190, "fh": 30,
+    "anims": { "idle": { "row": 0, "frames": 1, "fps": 1 } }
+  },
+  "background": {
+    "src": "sprites/background.png",
+    "fw": 1920, "fh": 1080,
+    "anims": { "idle": { "row": 0, "frames": 1, "fps": 1 } }
+  }
+}
