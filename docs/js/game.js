@@ -1722,9 +1722,9 @@ class Game {
       }
     }
 
-    if (this.phase==='countdown') return;
-    if (this.phase==='results')   return;
-    if (this.phase==='gameover')  return;
+    if (this.phase==='countdown') { this._updateHUD(); this._updateResultsPanel(); return; }
+    if (this.phase==='results')   { this._updateHUD(); this._updateResultsPanel(); return; }
+    if (this.phase==='gameover')  { this._updateHUD(); this._updateResultsPanel(); return; }
 
     const lp=this.localPlayer;
     if (lp) {
