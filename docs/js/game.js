@@ -25,7 +25,7 @@ const RESULTS_TIME     = 8;
 const BUILD_PLACEMENTS = 2;
 
 const CAM_LERP = 0.1; // camera smoothing (lower = smoother/slower)
-const VERSION  = '0.1.23';
+const VERSION  = '0.1.26';
 
 const TEAM = {
   green: { primary: '#27ae60', light: '#2ecc71', name: 'Green Team' },
@@ -553,6 +553,8 @@ class Player {
     this.ghostMode=false;
     this.placementsLeft=0;
     this._riding=null;
+    // Dead reckoning for remote players
+    this._remX=0; this._remY=0; this._remVX=0; this._remVY=0; this._remAge=0;
   }
 
   spawn(x,y) {
@@ -686,11 +688,26 @@ class Player {
 
   applyRemote(d) {
     const dx=d.x-this.x, dy=d.y-this.y;
-    if (dx*dx+dy*dy>250*250) { this.x=d.x; this.y=d.y; }
-    else { this.x=lerp(this.x,d.x,.28); this.y=lerp(this.y,d.y,.28); }
+    if (dx*dx+dy*dy>300*300) { this.x=d.x; this.y=d.y; } // hard teleport on large gap
+    // Store authoritative state; updateRemote() extrapolates each frame
+    this._remX=d.x; this._remY=d.y;
+    this._remVX=d.vx; this._remVY=d.vy;
+    this._remAge=0;
     this.vx=d.vx; this.vy=d.vy; this.facing=d.facing;
     this.onGround=d.onGround; this.state=d.state;
     this.walk=d.walk; this.ghostMode=d.ghostMode;
+  }
+
+  updateRemote() {
+    // Cap at 22 ticks — covers the 20-frame far-player send interval plus jitter
+    this._remAge = Math.min(this._remAge + 1, 22);
+    const ex = this._remX + this._remVX * this._remAge;
+    // Add gravity to vertical extrapolation so jump arcs predict correctly
+    const ey = this._remY + this._remVY * this._remAge
+             + 0.5 * GRAVITY * this._remAge * this._remAge;
+    this.x = lerp(this.x, ex, 0.35);
+    this.y = lerp(this.y, ey, 0.35);
+    if (Math.abs(this._remVX) > 0.5 && this.onGround) this.walk += 0.15;
   }
 
   snap() {
@@ -1497,9 +1514,13 @@ class Game {
       this.level.update(this._phaseTime);
       const lp = this.localPlayer;
       if (lp) lp.updateLocal(this.input, this.level, this.placement.active);
+      for (const p of Object.values(this.players)) {
+        if (p.id !== this.localId) p.updateRemote();
+      }
       this._sendTick = (this._sendTick||0) + 1;
-      if (this._sendTick%3===0 && lp) {
-        this.net.broadcast({ type:'player_update', ...lp.snap() });
+      if (lp) {
+        const iv = this._sendInterval();
+        if (this._sendTick % iv === 0) this.net.broadcast({ type:'player_update', ...lp.snap() });
       }
       return;
     }
@@ -1570,15 +1591,35 @@ class Game {
       }
     }
 
+    for (const p of Object.values(this.players)) {
+      if (p.id !== this.localId) p.updateRemote();
+    }
+
     this._sendTick=(this._sendTick||0)+1;
-    if (this._sendTick%3===0 && lp) {
-      this.net.broadcast({ type:'player_update', ...lp.snap() });
+    if (lp) {
+      const iv = this._sendInterval();
+      if (this._sendTick % iv === 0) this.net.broadcast({ type:'player_update', ...lp.snap() });
     }
 
     this._updateHUD();
     this._updateBuildPanel();
     this._updateResultsPanel();
     if (this._sendTick%6===0) this._updatePlayerDots();
+  }
+
+  _sendInterval() {
+    const lp = this.localPlayer;
+    if (!lp) return 20;
+    let minDist2 = Infinity;
+    for (const p of Object.values(this.players)) {
+      if (p.id === this.localId) continue;
+      const dx = lp.x - p.x, dy = lp.y - p.y;
+      const d2 = dx*dx + dy*dy;
+      if (d2 < minDist2) minDist2 = d2;
+    }
+    if (minDist2 < 150*150) return 3;   // nearly touching — 20 Hz
+    if (minDist2 < 600*600) return 6;   // on screen together — 10 Hz
+    return 20;                           // off screen — 3 Hz
   }
 
   _resolvePlayerCollisions() {
