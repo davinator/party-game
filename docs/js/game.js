@@ -25,7 +25,7 @@ const RESULTS_TIME     = 8;
 const BUILD_PLACEMENTS = 2;
 
 const CAM_LERP = 0.1; // camera smoothing (lower = smoother/slower)
-const VERSION  = '0.1.26';
+const VERSION  = '0.1.27';
 
 const TEAM = {
   green: { primary: '#27ae60', light: '#2ecc71', name: 'Green Team' },
@@ -563,7 +563,7 @@ class Player {
     this._coyote=0; this._jbuf=0; this.ghostMode=false;
   }
 
-  updateLocal(inp, level, placementActive=false) {
+  updateLocal(inp, level, placementActive=false, ghostSpeed=5) {
     if (this.state==='finished') return null;
 
     // Blue team's screen is horizontally mirrored — invert left/right
@@ -572,11 +572,10 @@ class Player {
     const goRight = isBlue ? inp.left  : inp.right;
 
     if (this.ghostMode) {
-      const spd=5;
-      if (goLeft)  { this.x-=spd; this.facing=-1; }
-      if (goRight) { this.x+=spd; this.facing=1;  }
-      if (inp.up)   this.y-=spd;
-      if (inp.down) this.y+=spd;
+      if (goLeft)  { this.x-=ghostSpeed; this.facing=-1; }
+      if (goRight) { this.x+=ghostSpeed; this.facing=1;  }
+      if (inp.up)   this.y-=ghostSpeed;
+      if (inp.down) this.y+=ghostSpeed;
       this.vx=0; this.vy=0; this.onGround=false;
       return null;
     }
@@ -1213,6 +1212,25 @@ class Game {
   _updateCamera() {
     const lp = this.localPlayer;
     if (!lp) return;
+
+    if (this.phase === 'build') {
+      const ghostTx = lp.team === 'blue'
+        ? clamp(WORLD_W - (lp.x + PW/2) - this.vw/2, 0, Math.max(0, WORLD_W - this.vw))
+        : clamp(lp.x + PW/2 - this.vw/2, 0, Math.max(0, WORLD_W - this.vw));
+      // Follow ghost strongly when keys held, barely at all when idle
+      const isMoving = this.input.left || this.input.right || this.input.up || this.input.down;
+      this._buildCamX = lerp(this._buildCamX, ghostTx, isMoving ? CAM_LERP : 0.015);
+      // Mouse edge panning — ramps up the closer to the screen edge
+      const EDGE = 80, PAN = 7;
+      const mx = this.input.mx;
+      if (mx < EDGE)            this._buildCamX -= (1 - mx / EDGE) * PAN;
+      else if (mx > this.vw - EDGE) this._buildCamX += (1 - (this.vw - mx) / EDGE) * PAN;
+      this._buildCamX = clamp(this._buildCamX, 0, Math.max(0, WORLD_W - this.vw));
+      this.cam.x = lerp(this.cam.x, this._buildCamX, 0.15);
+      this.cam.y = lerp(this.cam.y, clamp(lp.y + PH/2 - this.vh/2, 0, Math.max(0, WORLD_H - this.vh)), CAM_LERP);
+      return;
+    }
+
     const tx = lp.team === 'blue'
       ? clamp(WORLD_W - (lp.x + PW/2) - this.vw/2, 0, Math.max(0, WORLD_W - this.vw))
       : clamp(lp.x + PW/2 - this.vw/2, 0, Math.max(0, WORLD_W - this.vw));
@@ -1399,6 +1417,7 @@ class Game {
       this.level.reset();
       this._enterGame();
       this._spawnPlayers();
+      this._buildCamX = this.cam.x;
       Object.values(this.players).forEach(p=>{
         p.state='alive'; p.placementsLeft=BUILD_PLACEMENTS; p.ghostMode=true; p._buildDone=false;
       });
@@ -1551,7 +1570,7 @@ class Game {
 
     const lp=this.localPlayer;
     if (lp) {
-      const evt=lp.updateLocal(this.input, this.level, this.placement.active);
+      const evt=lp.updateLocal(this.input, this.level, this.placement.active, this.phase==='build' ? 10 : 5);
 
       this._resolvePlayerCollisions();
 
