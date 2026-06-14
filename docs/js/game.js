@@ -3,7 +3,8 @@
 // ─────────────────────────────────────────────
 //  WORLD CONSTANTS  (game-logic space)
 // ─────────────────────────────────────────────
-const WORLD_W = 3200, WORLD_H = 720;
+const WORLD_W = 3200, WORLD_H = 900;
+const ZOOM = 1.5;
 const GRAVITY    = 0.55;
 const MAX_FALL   = 20;
 const MOVE_MAX   = 5.5;
@@ -25,7 +26,7 @@ const RESULTS_TIME     = 8;
 const BUILD_PLACEMENTS = 2;
 
 const CAM_LERP = 0.1; // camera smoothing (lower = smoother/slower)
-const VERSION  = '0.1.30';
+const VERSION  = '0.1.32';
 
 const TEAM = {
   green: { primary: '#27ae60', light: '#2ecc71', name: 'Green Team' },
@@ -33,17 +34,17 @@ const TEAM = {
 };
 
 const OBJ = {
-  platform:         { w: 128, h: 20, label: 'Platform',    key: '1' },
-  spike:            { w: 32,  h: 24, label: 'Spike',       key: '2' },
-  spring:           { w: 48,  h: 16, label: 'Spring',      key: '3' },
-  moving_platform:  { w: 128, h: 20, label: 'Moving plat', key: '4',
+  platform:         { w: 128, h: 30, label: 'Platform',    key: '1' },
+  spike:            { w: 32,  h: 28, label: 'Spike',       key: '2' },
+  spring:           { w: 48,  h: 20, label: 'Spring',      key: '3' },
+  moving_platform:  { w: 128, h: 30, label: 'Moving plat', key: '4',
                       defaults: { rangeX:200, rangeY:0, speed:1.2 } },
-  conveyor:         { w: 128, h: 20, label: 'Conveyor',    key: '5' },
-  ice:              { w: 128, h: 14, label: 'Ice patch',   key: '6' },
-  shock_platform:   { w: 128, h: 20, label: 'Shock plat',  key: '7' },
-  disappearing:     { w: 128, h: 20, label: 'Vanish plat', key: '8' },
-  flip_platform:    { w: 128, h: 20, label: 'Flip plat',   key: '9' },
-  elevator:         { w: 80,  h: 20, label: 'Elevator',    key: '0',
+  conveyor:         { w: 128, h: 30, label: 'Conveyor',    key: '5' },
+  ice:              { w: 128, h: 20, label: 'Ice patch',   key: '6' },
+  shock_platform:   { w: 128, h: 30, label: 'Shock plat',  key: '7' },
+  disappearing:     { w: 128, h: 30, label: 'Vanish plat', key: '8' },
+  flip_platform:    { w: 128, h: 30, label: 'Flip plat',   key: '9' },
+  elevator:         { w: 80,  h: 30, label: 'Elevator',    key: '0',
                       defaults: { rangeY: 200 } },
   cannon:           { w: 32,  h: 32, label: 'Cannon',      key: 'q' },
   black_hole:       { w: 40,  h: 40, label: 'Black Hole',  key: 'w' },
@@ -75,16 +76,16 @@ const PALETTE = [
 //  BASE LEVEL  (wider world, more platforms)
 // ─────────────────────────────────────────────
 const BASE_LEVEL = [
-  { id:'bl_start', type:'platform',   x:40,   y:610, w:240, h:22, permanent:true },
-  { id:'bl_m1',    type:'platform',   x:480,  y:530, w:160, h:22, permanent:true },
-  { id:'bl_m2',    type:'platform',   x:900,  y:480, w:160, h:22, permanent:true },
-  { id:'bl_m3',    type:'platform',   x:1350, y:540, w:160, h:22, permanent:true },
-  { id:'bl_m4',    type:'platform',   x:1800, y:460, w:160, h:22, permanent:true },
-  { id:'bl_m5',    type:'platform',   x:2250, y:510, w:160, h:22, permanent:true },
-  { id:'bl_m6',    type:'platform',   x:2680, y:470, w:160, h:22, permanent:true },
-  { id:'bl_end',   type:'platform',   x:2900, y:570, w:240, h:22, permanent:true },
-  { id:'bl_sz',    type:'start_zone', x:58,   y:580, w:190, h:30 },
-  { id:'bl_ez',    type:'end_zone',   x:2920, y:540, w:190, h:30 },
+  { id:'bl_start', type:'platform',   x:40,   y:730, w:240, h:30, permanent:true },
+  { id:'bl_m1',    type:'platform',   x:480,  y:650, w:160, h:30, permanent:true },
+  { id:'bl_m2',    type:'platform',   x:900,  y:600, w:160, h:30, permanent:true },
+  { id:'bl_m3',    type:'platform',   x:1350, y:660, w:160, h:30, permanent:true },
+  { id:'bl_m4',    type:'platform',   x:1800, y:580, w:160, h:30, permanent:true },
+  { id:'bl_m5',    type:'platform',   x:2250, y:630, w:160, h:30, permanent:true },
+  { id:'bl_m6',    type:'platform',   x:2680, y:590, w:160, h:30, permanent:true },
+  { id:'bl_end',   type:'platform',   x:2900, y:690, w:240, h:30, permanent:true },
+  { id:'bl_sz',    type:'start_zone', x:58,   y:700, w:190, h:30 },
+  { id:'bl_ez',    type:'end_zone',   x:2920, y:660, w:190, h:30 },
 ];
 
 // ─────────────────────────────────────────────
@@ -92,27 +93,27 @@ const BASE_LEVEL = [
 // ─────────────────────────────────────────────
 const WAITING_LEVEL = [
   // Full-width floor — falling is impossible
-  { id:'wf',   type:'platform', x:0,    y:640, w:WORLD_W, h:80, permanent:true },
+  { id:'wf',   type:'platform', x:0,    y:820, w:WORLD_W, h:80, permanent:true },
   // Left beginner section
-  { id:'wp1',  type:'platform', x:180,  y:540, w:180, h:20, permanent:true },
-  { id:'wp2',  type:'platform', x:460,  y:460, w:140, h:20, permanent:true },
-  { id:'wp3',  type:'platform', x:720,  y:380, w:120, h:20, permanent:true },
-  { id:'wp4',  type:'platform', x:960,  y:460, w:160, h:20, permanent:true },
+  { id:'wp1',  type:'platform', x:180,  y:540, w:180, h:30, permanent:true },
+  { id:'wp2',  type:'platform', x:460,  y:460, w:140, h:30, permanent:true },
+  { id:'wp3',  type:'platform', x:720,  y:380, w:120, h:30, permanent:true },
+  { id:'wp4',  type:'platform', x:960,  y:460, w:160, h:30, permanent:true },
   // Staircase section
-  { id:'ws1',  type:'platform', x:1200, y:560, w:110, h:20, permanent:true },
-  { id:'ws2',  type:'platform', x:1360, y:480, w:110, h:20, permanent:true },
-  { id:'ws3',  type:'platform', x:1520, y:400, w:110, h:20, permanent:true },
-  { id:'ws4',  type:'platform', x:1680, y:320, w:110, h:20, permanent:true },
+  { id:'ws1',  type:'platform', x:1200, y:560, w:110, h:30, permanent:true },
+  { id:'ws2',  type:'platform', x:1360, y:480, w:110, h:30, permanent:true },
+  { id:'ws3',  type:'platform', x:1520, y:400, w:110, h:30, permanent:true },
+  { id:'ws4',  type:'platform', x:1680, y:320, w:110, h:30, permanent:true },
   // Wide landing
-  { id:'wp5',  type:'platform', x:1900, y:490, w:280, h:20, permanent:true },
+  { id:'wp5',  type:'platform', x:1900, y:490, w:280, h:30, permanent:true },
   // Right section
-  { id:'wp6',  type:'platform', x:2280, y:410, w:180, h:20, permanent:true },
-  { id:'wp7',  type:'platform', x:2560, y:510, w:160, h:20, permanent:true },
-  { id:'wp8',  type:'platform', x:2820, y:430, w:200, h:20, permanent:true },
+  { id:'wp6',  type:'platform', x:2280, y:410, w:180, h:30, permanent:true },
+  { id:'wp7',  type:'platform', x:2560, y:510, w:160, h:30, permanent:true },
+  { id:'wp8',  type:'platform', x:2820, y:430, w:200, h:30, permanent:true },
   // Springs for fun
-  { id:'wsp1', type:'spring', x:370,  y:624, w:48, h:16, permanent:true },
-  { id:'wsp2', type:'spring', x:1820, y:624, w:48, h:16, permanent:true },
-  { id:'wsp3', type:'spring', x:2480, y:624, w:48, h:16, permanent:true },
+  { id:'wsp1', type:'spring', x:370,  y:800, w:48, h:20, permanent:true },
+  { id:'wsp2', type:'spring', x:1820, y:800, w:48, h:20, permanent:true },
+  { id:'wsp3', type:'spring', x:2480, y:800, w:48, h:20, permanent:true },
 ];
 
 // ─────────────────────────────────────────────
@@ -138,23 +139,37 @@ function circleRect(cx,cy,r, rx,ry,rw,rh) {
 // ─────────────────────────────────────────────
 //  SPRITE LOADER
 // ─────────────────────────────────────────────
+const SPRITE_MANIFEST = {
+  player_green:     { src:'sprites/player_green.png',     fw:26,   fh:40,  anims:{ idle:{row:0,frames:1,fps:1}, walk:{row:1,frames:4,fps:10}, jump:{row:2,frames:1,fps:1}, fall:{row:3,frames:1,fps:1}, ghost:{row:4,frames:4,fps:6}, finished:{row:5,frames:4,fps:6} } },
+  player_blue:      { src:'sprites/player_blue.png',      fw:26,   fh:40,  anims:{ idle:{row:0,frames:1,fps:1}, walk:{row:1,frames:4,fps:10}, jump:{row:2,frames:1,fps:1}, fall:{row:3,frames:1,fps:1}, ghost:{row:4,frames:4,fps:6}, finished:{row:5,frames:4,fps:6} } },
+  platform:         { src:'sprites/platform.png',         fw:1024, fh:156, anims:{ idle:{row:0,frames:1,fps:1} } },
+  moving_platform:  { src:'sprites/moving_platform.png',  fw:1024, fh:154, anims:{ idle:{row:0,frames:1,fps:1} } },
+  conveyor:         { src:'sprites/conveyor.png',         fw:256,  fh:77,  anims:{ roll:{row:0,frames:4,fps:8}, roll_rev:{row:1,frames:4,fps:8} } },
+  ice:              { src:'sprites/ice.png',              fw:1024, fh:154, anims:{ idle:{row:0,frames:1,fps:1} } },
+  shock_platform:   { src:'sprites/shock_platform.png',   fw:256,  fh:78,  anims:{ idle:{row:0,frames:1,fps:1}, shocked:{row:1,frames:4,fps:12} } },
+  disappearing:     { src:'sprites/disappearing.png',     fw:1024, fh:156, anims:{ idle:{row:0,frames:1,fps:1}, gone:{row:1,frames:1,fps:1} } },
+  flip_platform:    { src:'sprites/flip_platform.png',    fw:1024, fh:156, anims:{ idle:{row:0,frames:1,fps:1}, flipped:{row:1,frames:1,fps:1} } },
+  elevator:         { src:'sprites/elevator.png',         fw:640,  fh:160, anims:{ idle:{row:0,frames:1,fps:1}, moving:{row:1,frames:1,fps:1} } },
+  spike:            { src:'sprites/spike.png',            fw:256,  fh:191, anims:{ idle:{row:0,frames:1,fps:1} } },
+  spring:           { src:'sprites/spring.png',           fw:192,  fh:84,  anims:{ idle:{row:0,frames:1,fps:1}, triggered:{row:1,frames:4,fps:12} } },
+  cannon:           { src:'sprites/cannon.png',           fw:256,  fh:256, anims:{ idle:{row:0,frames:1,fps:1} } },
+  black_hole:       { src:'sprites/black_hole.png',       fw:160,  fh:160, anims:{ spin:{row:0,frames:4,fps:12} } },
+  start_zone:       { src:'sprites/start_zone.png',       fw:760,  fh:128, anims:{ idle:{row:0,frames:1,fps:1} } },
+  end_zone:         { src:'sprites/end_zone.png',         fw:760,  fh:128, anims:{ idle:{row:0,frames:1,fps:1} } },
+  background:       { src:'sprites/background.png',       fw:1920, fh:1080,anims:{ idle:{row:0,frames:1,fps:1} } },
+};
+
 class SpriteLoader {
   constructor() { this._imgs = {}; this._defs = {}; }
 
-  load(path) {
-    fetch(path)
-      .then(r => r.ok ? r.json() : null)
-      .then(manifest => {
-        if (!manifest) return;
-        this._defs = manifest;
-        for (const [name, def] of Object.entries(manifest)) {
-          if (!def.src) continue;
-          const img = new Image();
-          img.onload = () => { this._imgs[name] = img; };
-          img.src = def.src;
-        }
-      })
-      .catch(() => {}); // manifest absent — all shapes, no crash
+  load(manifest) {
+    this._defs = manifest;
+    for (const [name, def] of Object.entries(manifest)) {
+      if (!def.src) continue;
+      const img = new Image();
+      img.onload = () => { this._imgs[name] = img; };
+      img.src = def.src;
+    }
   }
 
   // Returns true if drawn; false = caller renders its own fallback
@@ -878,7 +893,7 @@ class Renderer {
       for (let i=0;i<14;i++) {
         const bx = ((i*317.3 - cx) % (vw+500) + vw+500) % (vw+500) - 250;
         const by = 30 + (i*71.9) % (vh*0.42);
-        const rw = 60 + (i*53.1) % 110, rh = 18 + (i*29.7) % 22;
+        const rw = 55 + (i*53.1) % 90, rh = 28 + (i*29.7) % 32;
         c.beginPath();
         c.ellipse(bx,        by,        rw,       rh,       0,0,Math.PI*2);
         c.ellipse(bx-rw*0.4, by+rh*0.2, rw*0.58,  rh*0.72,  0,0,Math.PI*2);
@@ -1023,7 +1038,7 @@ class Game {
     this._phaseTime   = 0; // seconds since phase start — drives deterministic dynamic objects
     this._loopStarted = false;
 
-    sprites.load('sprites/manifest.json');
+    sprites.load(SPRITE_MANIFEST);
 
     this._resize();
     window.addEventListener('resize', ()=>this._resize());
@@ -1039,9 +1054,9 @@ class Game {
     const rect=this.canvas.getBoundingClientRect();
     const sx=clientX-rect.left, sy=clientY-rect.top;
     if (this.localPlayer?.team === 'blue') {
-      return { x: WORLD_W - this.cam.x - sx, y: sy + this.cam.y };
+      return { x: WORLD_W - this.cam.x - sx/ZOOM, y: sy/ZOOM + this.cam.y };
     }
-    return { x: sx + this.cam.x, y: sy + this.cam.y };
+    return { x: sx/ZOOM + this.cam.x, y: sy/ZOOM + this.cam.y };
   }
 
   _canPlace() {
@@ -1227,28 +1242,27 @@ class Game {
     const lp = this.localPlayer;
     if (!lp) return;
 
+    const VW = this.vw / ZOOM, VH = this.vh / ZOOM;
     if (this.phase === 'build') {
       const ghostTx = lp.team === 'blue'
-        ? clamp(WORLD_W - (lp.x + PW/2) - this.vw/2, 0, Math.max(0, WORLD_W - this.vw))
-        : clamp(lp.x + PW/2 - this.vw/2, 0, Math.max(0, WORLD_W - this.vw));
-      // Follow ghost strongly when keys held, barely at all when idle
+        ? clamp(WORLD_W - (lp.x + PW/2) - VW/2, 0, Math.max(0, WORLD_W - VW))
+        : clamp(lp.x + PW/2 - VW/2, 0, Math.max(0, WORLD_W - VW));
       const isMoving = this.input.left || this.input.right || this.input.up || this.input.down;
       this._buildCamX = lerp(this._buildCamX, ghostTx, isMoving ? CAM_LERP : 0.015);
-      // Mouse edge panning — ramps up the closer to the screen edge
       const EDGE = 80, PAN = 7;
       const mx = this.input.mx;
-      if (mx < EDGE)            this._buildCamX -= (1 - mx / EDGE) * PAN;
+      if (mx < EDGE)                this._buildCamX -= (1 - mx / EDGE) * PAN;
       else if (mx > this.vw - EDGE) this._buildCamX += (1 - (this.vw - mx) / EDGE) * PAN;
-      this._buildCamX = clamp(this._buildCamX, 0, Math.max(0, WORLD_W - this.vw));
+      this._buildCamX = clamp(this._buildCamX, 0, Math.max(0, WORLD_W - VW));
       this.cam.x = lerp(this.cam.x, this._buildCamX, 0.15);
-      this.cam.y = lerp(this.cam.y, clamp(lp.y + PH/2 - this.vh/2, 0, Math.max(0, WORLD_H - this.vh)), CAM_LERP);
+      this.cam.y = lerp(this.cam.y, clamp(lp.y + PH/2 - VH/2, 0, Math.max(0, WORLD_H - VH)), CAM_LERP);
       return;
     }
 
     const tx = lp.team === 'blue'
-      ? clamp(WORLD_W - (lp.x + PW/2) - this.vw/2, 0, Math.max(0, WORLD_W - this.vw))
-      : clamp(lp.x + PW/2 - this.vw/2, 0, Math.max(0, WORLD_W - this.vw));
-    const ty = clamp(lp.y + PH/2 - this.vh/2, 0, Math.max(0, WORLD_H - this.vh));
+      ? clamp(WORLD_W - (lp.x + PW/2) - VW/2, 0, Math.max(0, WORLD_W - VW))
+      : clamp(lp.x + PW/2 - VW/2, 0, Math.max(0, WORLD_W - VW));
+    const ty = clamp(lp.y + PH/2 - VH/2, 0, Math.max(0, WORLD_H - VH));
     this.cam.x = lerp(this.cam.x, tx, CAM_LERP);
     this.cam.y = lerp(this.cam.y, ty, CAM_LERP);
   }
@@ -1496,11 +1510,12 @@ class Game {
     });
     const lp=this.localPlayer;
     if (lp) {
+      const _VW = this.vw/ZOOM, _VH = this.vh/ZOOM;
       const tx = lp.team==='blue'
-        ? clamp(WORLD_W-(lp.x+PW/2)-this.vw/2, 0, Math.max(0,WORLD_W-this.vw))
-        : clamp(lp.x+PW/2-this.vw/2, 0, Math.max(0,WORLD_W-this.vw));
+        ? clamp(WORLD_W-(lp.x+PW/2)-_VW/2, 0, Math.max(0,WORLD_W-_VW))
+        : clamp(lp.x+PW/2-_VW/2, 0, Math.max(0,WORLD_W-_VW));
       this.cam.x = tx;
-      this.cam.y = clamp(lp.y+PH/2-this.vh/2, 0, Math.max(0,WORLD_H-this.vh));
+      this.cam.y = clamp(lp.y+PH/2-_VH/2, 0, Math.max(0,WORLD_H-_VH));
     }
   }
 
@@ -1712,6 +1727,7 @@ class Game {
     // ── World-space objects ──
     ctx.save();
     const localTeam = this.localPlayer?.team;
+    ctx.scale(ZOOM, ZOOM);
     if (localTeam === 'blue') {
       ctx.translate(WORLD_W - Math.round(cam.x), -Math.round(cam.y));
       ctx.scale(-1, 1);
