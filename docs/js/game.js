@@ -601,7 +601,7 @@ class Player {
     this._coyote=0; this._jbuf=0; this.ghostMode=false;
   }
 
-  updateLocal(inp, level, placementActive=false, ghostSpeed=5) {
+  updateLocal(inp, level, placementActive=false, ghostSpeed=5, gravityGhost=false) {
     if (this.state==='finished') return null;
 
     // Blue team's screen is horizontally mirrored — invert left/right
@@ -610,6 +610,33 @@ class Player {
     const goRight = isBlue ? inp.left  : inp.right;
 
     if (this.ghostMode) {
+      if (gravityGhost) {
+        // Physics-based ghost (dead during play) — gravity, platform landing, respawn
+        const { solids } = level;
+        if (goLeft)  { this.vx -= MOVE_ACCEL; this.facing=-1; }
+        if (goRight) { this.vx += MOVE_ACCEL; this.facing=1; }
+        this.vx = clamp(this.vx, -MOVE_MAX, MOVE_MAX);
+        if (!goLeft && !goRight) {
+          this.vx *= this.onGround ? FRICTION : AIR_FRIC;
+          if (Math.abs(this.vx)<0.08) this.vx=0;
+        }
+        if (this._coyote>0) this._coyote--; else this._coyote=0;
+        if (this.onGround) this._coyote=COYOTE;
+        if (this._jbuf>0) {
+          if (this.onGround||this._coyote>0) { this.vy=JUMP_VEL; this._coyote=0; this.onGround=false; }
+          this._jbuf--;
+        }
+        this.vy += GRAVITY; if (this.vy>MAX_FALL) this.vy=MAX_FALL;
+        this.x += this.vx;
+        this._resolveX(solids);
+        if (this.x<0)            { this.x=0;            this.vx=0; }
+        if (this.x>WORLD_W-PW)   { this.x=WORLD_W-PW;  this.vx=0; }
+        this.onGround=false;
+        this.y += this.vy;
+        this._resolveY(solids);
+        return null;
+      }
+      // Fly mode (build phase)
       if (goLeft)  { this.x-=ghostSpeed; this.facing=-1; }
       if (goRight) { this.x+=ghostSpeed; this.facing=1;  }
       if (inp.up)   this.y-=ghostSpeed;
@@ -1091,6 +1118,7 @@ class Game {
     this.round       = 1;
     this.totalRounds = DEFAULT_ROUNDS;
     this._deathOrder = [];
+    this._camFreePan = false;
 
     // Viewport & camera (screen-space)
     this.vw  = window.innerWidth;
@@ -1126,7 +1154,7 @@ class Game {
   _canPlace() {
     const lp=this.localPlayer; if (!lp) return false;
     return (this.phase==='build' && lp.placementsLeft>0) ||
-           (this.phase==='play'  && lp.state==='dead');
+           (this.phase==='play' && lp.state==='dead' && lp.placementsLeft>0);
   }
 
   _startNextRound() {
@@ -1324,19 +1352,27 @@ class Game {
     if (!lp) return;
 
     const VW = this.vw / ZOOM, VH = this.vh / ZOOM;
-    if (this.phase === 'build') {
-      const ghostTx = lp.team === 'blue'
-        ? clamp(WORLD_W - (lp.x + PW/2) - VW/2, 0, Math.max(0, WORLD_W - VW))
-        : clamp(lp.x + PW/2 - VW/2, 0, Math.max(0, WORLD_W - VW));
-      const isMoving = this.input.left || this.input.right || this.input.up || this.input.down;
-      this._buildCamX = lerp(this._buildCamX, ghostTx, isMoving ? CAM_LERP : 0.015);
-      const EDGE = 80, PAN = 7;
-      const mx = this.input.mx;
-      if (mx < EDGE)                this._buildCamX -= (1 - mx / EDGE) * PAN;
-      else if (mx > this.vw - EDGE) this._buildCamX += (1 - (this.vw - mx) / EDGE) * PAN;
-      this._buildCamX = clamp(this._buildCamX, 0, Math.max(0, WORLD_W - VW));
-      this.cam.x = lerp(this.cam.x, this._buildCamX, 0.15);
-      this.cam.y = lerp(this.cam.y, clamp(lp.y + PH/2 - VH/2, 0, Math.max(0, WORLD_H - VH)), CAM_LERP);
+    const freePanMode = this.phase === 'build' ||
+                       (this.phase === 'play' && lp.state === 'dead');
+    if (freePanMode) {
+      const isMoving = this.input.left || this.input.right ||
+                       (this.phase==='build' && (this.input.up || this.input.down));
+      if (isMoving) this._camFreePan = false;
+
+      if (this._camFreePan) {
+        // Velocity-based mouse panning: mouse offset from screen centre drives camera speed
+        const PAN_MAX = 10;
+        const panX = ((this.input.mx - this.vw/2) / (this.vw/2)) * PAN_MAX;
+        const panY = ((this.input.my - this.vh/2) / (this.vh/2)) * PAN_MAX;
+        this.cam.x = clamp(this.cam.x + panX, 0, Math.max(0, WORLD_W - VW));
+        this.cam.y = clamp(this.cam.y + panY, 0, Math.max(0, WORLD_H - VH));
+      } else {
+        // Ghost-follow
+        const tx = clamp(lp.x + PW/2 - VW/2, 0, Math.max(0, WORLD_W - VW));
+        const ty = clamp(lp.y + PH/2 - VH/2, 0, Math.max(0, WORLD_H - VH));
+        this.cam.x = lerp(this.cam.x, tx, CAM_LERP);
+        this.cam.y = lerp(this.cam.y, ty, CAM_LERP);
+      }
       return;
     }
 
@@ -1552,6 +1588,7 @@ class Game {
       this._enterGame();
       this._spawnPlayers();
       this._buildCamX = this.cam.x;
+      this._camFreePan = true;
       const n = Object.keys(this.players).length;
       const base = n > 6 ? 1 : 2;
       const bonusCount = n > 6 ? Math.floor(n * 0.3) : 0;
@@ -1716,7 +1753,7 @@ class Game {
 
     const lp=this.localPlayer;
     if (lp) {
-      const evt=lp.updateLocal(this.input, this.level, this.placement.active, this.phase==='build' ? 10 : 5);
+      const evt=lp.updateLocal(this.input, this.level, this.placement.active, this.phase==='build' ? 10 : 5, this.phase==='play');
 
       this._resolvePlayerCollisions();
 
@@ -1734,6 +1771,8 @@ class Game {
             lp.state='dead'; lp.ghostMode=true;
             this.net.broadcast({ type:'player_event', playerId:this.localId, event:'died' });
             this._deathOrder.push(this.localId);
+            { const tot=Object.keys(this.players).length; lp.placementsLeft=this._deathOrder.length<=Math.ceil(tot*0.5)?1:0; }
+            this._camFreePan=true;
             break;
           }
         }
@@ -1743,10 +1782,18 @@ class Game {
         lp.state='dead'; lp.ghostMode=true;
         this.net.broadcast({ type:'player_event', playerId:this.localId, event:'died' });
         this._deathOrder.push(this.localId);
+        { const tot=Object.keys(this.players).length; lp.placementsLeft=this._deathOrder.length<=Math.ceil(tot*0.5)?1:0; }
+        this._camFreePan=true;
       }
       if (evt==='finished' && lp.state==='alive') {
         lp.state='finished'; lp.ghostMode=false;
         this.net.broadcast({ type:'player_event', playerId:this.localId, event:'finished' });
+      }
+
+      // Ghost respawn — dead player fell off world during play
+      if (lp.state==='dead' && lp.ghostMode && this.phase==='play' && lp.y > DEATH_Y + 100) {
+        const sp = this.level.startPos();
+        lp.spawn(sp.x, sp.y);
       }
 
       if (this.isHost && this.phase==='play') {
@@ -1824,6 +1871,9 @@ class Game {
     if (!lp) return;
 
     if (inp.jumpPressed && lp.state==='alive' && !lp.ghostMode) {
+      lp._jbuf=JUMP_BUF;
+    }
+    if (inp.jumpPressed && lp.state==='dead' && lp.ghostMode && this.phase==='play') {
       lp._jbuf=JUMP_BUF;
     }
 
