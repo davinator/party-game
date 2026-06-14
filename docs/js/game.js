@@ -26,7 +26,7 @@ const RESULTS_TIME     = 8;
 const BUILD_PLACEMENTS = 2;
 
 const CAM_LERP = 0.1; // camera smoothing (lower = smoother/slower)
-const VERSION  = '0.1.35';
+const VERSION  = '0.1.36';
 
 const TEAM = {
   green: { primary: '#27ae60', light: '#2ecc71', name: 'Green Team' },
@@ -732,21 +732,32 @@ class Player {
     // Store authoritative state; updateRemote() extrapolates each frame
     this._remX=d.x; this._remY=d.y;
     this._remVX=d.vx; this._remVY=d.vy;
+    this._remOnGround=d.onGround;
     this._remAge=0;
     this.vx=d.vx; this.vy=d.vy; this.facing=d.facing;
     this.onGround=d.onGround; this.state=d.state;
     this.walk=d.walk; this.ghostMode=d.ghostMode;
   }
 
-  updateRemote() {
+  updateRemote(solids=[]) {
     // Cap at 22 ticks — covers the 20-frame far-player send interval plus jitter
     this._remAge = Math.min(this._remAge + 1, 22);
     const ex = this._remX + this._remVX * this._remAge;
-    // Add gravity to vertical extrapolation so jump arcs predict correctly
-    const ey = this._remY + this._remVY * this._remAge
-             + 0.5 * GRAVITY * this._remAge * this._remAge;
+    // Skip gravity when the authoritative state had the player grounded — otherwise
+    // standing players appear to fall every prediction window and then snap back up
+    const ey = this._remOnGround
+      ? this._remY
+      : this._remY + this._remVY * this._remAge + 0.5 * GRAVITY * this._remAge * this._remAge;
     this.x = lerp(this.x, ex, 0.35);
     this.y = lerp(this.y, ey, 0.35);
+    // Clamp predicted Y against solid surfaces so the player never visually
+    // phases through a platform while waiting for the next authoritative update
+    for (const o of solids) {
+      if (!overlap(this.x, this.y, PW, PH, o.x, o.y, o.w, o.h)) continue;
+      const ot=(this.y+PH)-o.y, ob=(o.y+o.h)-this.y;
+      if (ot<ob) { this.y-=ot; this.onGround=true; }
+      else       { this.y+=ob; }
+    }
     if (Math.abs(this._remVX) > 0.5 && this.onGround) this.walk += 0.15;
   }
 
@@ -757,7 +768,8 @@ class Player {
   }
 
   draw(ctx, isLocal, asGhost=false) {
-    const x=Math.round(this.x), y=Math.round(this.y);
+    const x=Math.round(isLocal && this._drawX!=null ? this._drawX : this.x);
+    const y=Math.round(this.y);
     const tc=TEAM[this.team];
     ctx.globalAlpha = asGhost ? 0.38 : 1;
 
@@ -1583,7 +1595,7 @@ class Game {
       const lp = this.localPlayer;
       if (lp) lp.updateLocal(this.input, this.level, this.placement.active);
       for (const p of Object.values(this.players)) {
-        if (p.id !== this.localId) p.updateRemote();
+        if (p.id !== this.localId) p.updateRemote(this.level.solids);
       }
       this._sendTick = (this._sendTick||0) + 1;
       if (lp) {
@@ -1660,7 +1672,7 @@ class Game {
     }
 
     for (const p of Object.values(this.players)) {
-      if (p.id !== this.localId) p.updateRemote();
+      if (p.id !== this.localId) p.updateRemote(this.level.solids);
     }
 
     this._sendTick=(this._sendTick||0)+1;
@@ -1749,10 +1761,10 @@ class Game {
     const localTeam = this.localPlayer?.team;
     ctx.scale(ZOOM, ZOOM);
     if (localTeam === 'blue') {
-      ctx.translate(WORLD_W - Math.round(cam.x), -Math.round(cam.y));
+      ctx.translate(WORLD_W - cam.x, -cam.y);
       ctx.scale(-1, 1);
     } else {
-      ctx.translate(-Math.round(cam.x), -Math.round(cam.y));
+      ctx.translate(-cam.x, -cam.y);
     }
 
     this.level.draw(ctx);
@@ -1771,7 +1783,13 @@ class Game {
       .forEach(p=>p.draw(ctx, false, inPlay&&p.ghostMode));
 
     const lp=this.localPlayer;
-    if (lp) lp.draw(ctx, true, inPlay&&lp.ghostMode);
+    if (lp) {
+      // Extrapolate horizontal position between physics ticks for smooth rendering
+      const alpha = Math.min(this._acc / (1000/60), 1);
+      lp._drawX = lp.x + lp.vx * alpha;
+      lp.draw(ctx, true, inPlay&&lp.ghostMode);
+      lp._drawX = null;
+    }
 
     this.placement.drawGhost(ctx);
 
