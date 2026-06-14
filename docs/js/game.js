@@ -26,7 +26,7 @@ const RESULTS_TIME     = 8;
 const BUILD_PLACEMENTS = 2;
 
 const CAM_LERP = 0.1; // camera smoothing (lower = smoother/slower)
-const VERSION  = '0.1.34';
+const VERSION  = '0.1.35';
 
 const TEAM = {
   green: { primary: '#27ae60', light: '#2ecc71', name: 'Green Team' },
@@ -114,6 +114,23 @@ const WAITING_LEVEL = [
   { id:'wsp1', type:'spring', x:370,  y:800, w:48, h:20, permanent:true },
   { id:'wsp2', type:'spring', x:1820, y:800, w:48, h:20, permanent:true },
   { id:'wsp3', type:'spring', x:2480, y:800, w:48, h:20, permanent:true },
+  // ─── OBSTACLE DEMOS ─────────────────────────────────────────
+  // Floor-level: step onto these without jumping
+  { id:'d_conv', type:'conveyor',        x:60,   y:790, w:256, h:30, permanent:true },
+  { id:'d_ice',  type:'ice',             x:440,  y:800, w:192, h:20, permanent:true },
+  { id:'d_spk',  type:'spike',           x:660,  y:792, w:32,  h:28, permanent:true },
+  // Elevated row at y=660 — one short jump from the floor
+  { id:'d_shk',  type:'shock_platform',  x:700,  y:660, w:128, h:30, permanent:true },
+  { id:'d_dis',  type:'disappearing',    x:900,  y:660, w:128, h:30, permanent:true },
+  { id:'d_flp',  type:'flip_platform',   x:1100, y:660, w:128, h:30, permanent:true },
+  { id:'d_mov',  type:'moving_platform', x:1350, y:660, w:128, h:30, permanent:true,
+    rangeX:150, rangeY:0, speed:1.2 },
+  { id:'d_elv',  type:'elevator',        x:1620, y:660, w:80,  h:30, permanent:true,
+    rangeY:200 },
+  // Right-section hazards — explore at your own risk
+  { id:'d_bh',   type:'black_hole',      x:3060, y:560, w:40,  h:40, permanent:true },
+  { id:'d_can',  type:'cannon',          x:3130, y:788, w:32,  h:32, permanent:true,
+    rotation:180 },
 ];
 
 // ─────────────────────────────────────────────
@@ -692,6 +709,9 @@ class Player {
     for (const o of solids) {
       if (!overlap(this.x,this.y,PW,PH, o.x,o.y,o.w,o.h)) continue;
       const ol=(this.x+PW)-o.x, or2=(o.x+o.w)-this.x;
+      const ot=(this.y+PH)-o.y, ob=(o.y+o.h)-this.y;
+      // If vertical penetration is shallower, skip — _resolveY will land the player on top instead
+      if (Math.min(ol,or2) >= Math.min(ot,ob)) continue;
       if (ol<or2) { this.x-=ol; this.vx=0; } else { this.x+=or2; this.vx=0; }
     }
   }
