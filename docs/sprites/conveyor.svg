@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg"
+     viewBox="0 0 128 30" width="128" height="30" preserveAspectRatio="none">
+  <defs>
+    <linearGradient id="belt" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%"   stop-color="#484848"/>
+      <stop offset="100%" stop-color="#282828"/>
+    </linearGradient>
+    <clipPath id="bc"><rect x="2" y="2" width="124" height="26"/></clipPath>
+  </defs>
+  <rect x="0" y="0" width="128" height="30" fill="#1e1e1e"/>
+  <rect x="2" y="2" width="124" height="26" fill="url(#belt)"/>
+  <g clip-path="url(#bc)">
+    <line x1="-30.0" y1="3" x2="0.0" y2="27" stroke="rgba(255,255,255,0.13)" stroke-width="2"/><line x1="-20.0" y1="3" x2="10.0" y2="27" stroke="rgba(255,255,255,0.13)" stroke-width="2"/><line x1="-10.0" y1="3" x2="20.0" y2="27" stroke="rgba(255,255,255,0.13)" stroke-width="2"/><line x1="0.0" y1="3" x2="30.0" y2="27" stroke="rgba(255,255,255,0.13)" stroke-width="2"/><line x1="10.0" y1="3" x2="40.0" y2="27" stroke="rgba(255,255,255,0.13)" stroke-width="2"/><line x1="20.0" y1="3" x2="50.0" y2="27" stroke="rgba(255,255,255,0.13)" stroke-width="2"/><line x1="30.0" y1="3" x2="60.0" y2="27" stroke="rgba(255,255,255,0.13)" stroke-width="2"/><line x1="40.0" y1="3" x2="70.0" y2="27" stroke="rgba(255,255,255,0.13)" stroke-width="2"/><line x1="50.0" y1="3" x2="80.0" y2="27" stroke="rgba(255,255,255,0.13)" stroke-width="2"/><line x1="60.0" y1="3" x2="90.0" y2="27" stroke="rgba(255,255,255,0.13)" stroke-width="2"/><line x1="70.0" y1="3" x2="100.0" y2="27" stroke="rgba(255,255,255,0.13)" stroke-width="2"/><line x1="80.0" y1="3" x2="110.0" y2="27" stroke="rgba(255,255,255,0.13)" stroke-width="2"/><line x1="90.0" y1="3" x2="120.0" y2="27" stroke="rgba(255,255,255,0.13)" stroke-width="2"/><line x1="100.0" y1="3" x2="130.0" y2="27" stroke="rgba(255,255,255,0.13)" stroke-width="2"/><line x1="110.0" y1="3" x2="140.0" y2="27" stroke="rgba(255,255,255,0.13)" stroke-width="2"/><line x1="120.0" y1="3" x2="150.0" y2="27" stroke="rgba(255,255,255,0.13)" stroke-width="2"/><line x1="130.0" y1="3" x2="160.0" y2="27" stroke="rgba(255,255,255,0.13)" stroke-width="2"/><line x1="140.0" y1="3" x2="170.0" y2="27" stroke="rgba(255,255,255,0.13)" stroke-width="2"/><line x1="150.0" y1="3" x2="180.0" y2="27" stroke="rgba(255,255,255,0.13)" stroke-width="2"/>
+    <polyline points="16,5 22,7.5 16,10" fill="none" stroke="rgba(255,200,0,0.55)" stroke-width="1.5" stroke-linejoin="round"/><polyline points="36,5 42,7.5 36,10" fill="none" stroke="rgba(255,200,0,0.55)" stroke-width="1.5" stroke-linejoin="round"/><polyline points="56,5 62,7.5 56,10" fill="none" stroke="rgba(255,200,0,0.55)" stroke-width="1.5" stroke-linejoin="round"/><polyline points="76,5 82,7.5 76,10" fill="none" stroke="rgba(255,200,0,0.55)" stroke-width="1.5" stroke-linejoin="round"/><polyline points="96,5 102,7.5 96,10" fill="none" stroke="rgba(255,200,0,0.55)" stroke-width="1.5" stroke-linejoin="round"/><polyline points="116,5 122,7.5 116,10" fill="none" stroke="rgba(255,200,0,0.55)" stroke-width="1.5" stroke-linejoin="round"/>
+  </g>
+  <line x1="2" y1="3" x2="126" y2="3"
+        stroke="rgba(255,255,255,0.18)" stroke-width="1"/>
+  <rect x="1" y="1" width="126" height="28"
+        fill="none" stroke="#1e1e1e" stroke-width="2"/>
+</svg>

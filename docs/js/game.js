@@ -26,7 +26,7 @@ const RESULTS_TIME     = 8;
 const BUILD_PLACEMENTS = 2;
 
 const CAM_LERP = 0.1; // camera smoothing (lower = smoother/slower)
-const VERSION  = '0.1.33';
+const VERSION  = '0.1.34';
 
 const TEAM = {
   green: { primary: '#27ae60', light: '#2ecc71', name: 'Green Team' },
@@ -142,21 +142,20 @@ function circleRect(cx,cy,r, rx,ry,rw,rh) {
 const SPRITE_MANIFEST = {
   player_green:     { src:'sprites/player_green.png',     fw:26,   fh:40,  anims:{ idle:{row:0,frames:1,fps:1}, walk:{row:1,frames:4,fps:10}, jump:{row:2,frames:1,fps:1}, fall:{row:3,frames:1,fps:1}, ghost:{row:4,frames:4,fps:6}, finished:{row:5,frames:4,fps:6} } },
   player_blue:      { src:'sprites/player_blue.png',      fw:26,   fh:40,  anims:{ idle:{row:0,frames:1,fps:1}, walk:{row:1,frames:4,fps:10}, jump:{row:2,frames:1,fps:1}, fall:{row:3,frames:1,fps:1}, ghost:{row:4,frames:4,fps:6}, finished:{row:5,frames:4,fps:6} } },
-  platform:         { src:'sprites/platform_tile.svg',    fw:128,  fh:30,  tile:true, anims:{ idle:{row:0,frames:1,fps:1} } },
-  moving_platform:  { src:'sprites/moving_platform.png',  fw:1024, fh:154, anims:{ idle:{row:0,frames:1,fps:1} } },
-  conveyor:         { src:'sprites/conveyor.png',         fw:256,  fh:77,  anims:{ roll:{row:0,frames:4,fps:8}, roll_rev:{row:1,frames:4,fps:8} } },
-  ice:              { src:'sprites/ice.png',              fw:1024, fh:154, anims:{ idle:{row:0,frames:1,fps:1} } },
-  shock_platform:   { src:'sprites/shock_platform.png',   fw:256,  fh:78,  anims:{ idle:{row:0,frames:1,fps:1}, shocked:{row:1,frames:4,fps:12} } },
-  disappearing:     { src:'sprites/disappearing.png',     fw:1024, fh:156, anims:{ idle:{row:0,frames:1,fps:1}, gone:{row:1,frames:1,fps:1} } },
-  flip_platform:    { src:'sprites/flip_platform.png',    fw:1024, fh:156, anims:{ idle:{row:0,frames:1,fps:1}, flipped:{row:1,frames:1,fps:1} } },
-  elevator:         { src:'sprites/elevator.png',         fw:640,  fh:160, anims:{ idle:{row:0,frames:1,fps:1}, moving:{row:1,frames:1,fps:1} } },
-  spike:            { src:'sprites/spike.svg',            fw:32,   fh:28,  anims:{ idle:{row:0,frames:1,fps:1} } },
-  spring:           { src:'sprites/spring.svg',           fw:48,   fh:20,  anims:{ idle:{row:0,frames:1,fps:1} } },
-  cannon:           { src:'sprites/cannon.png',           fw:256,  fh:256, anims:{ idle:{row:0,frames:1,fps:1} } },
-  black_hole:       { src:'sprites/black_hole.png',       fw:160,  fh:160, anims:{ spin:{row:0,frames:4,fps:12} } },
-  start_zone:       { src:'sprites/start_zone.png',       fw:760,  fh:128, anims:{ idle:{row:0,frames:1,fps:1} } },
-  end_zone:         { src:'sprites/end_zone.png',         fw:760,  fh:128, anims:{ idle:{row:0,frames:1,fps:1} } },
-  background:       { src:'sprites/background.png',       fw:1920, fh:1080,anims:{ idle:{row:0,frames:1,fps:1} } },
+  platform:         { src:'sprites/platform_tile.svg',   fw:128, fh:30, tile:true, anims:{ idle:{row:0,frames:1,fps:1} } },
+  moving_platform:  { src:'sprites/moving_platform.svg', fw:128, fh:30, tile:true, anims:{ idle:{row:0,frames:1,fps:1} } },
+  conveyor:         { src:'sprites/conveyor.svg',        fw:128, fh:30, tile:true, anims:{ roll:{row:0,frames:1,fps:1}, roll_rev:{row:0,frames:1,fps:1} } },
+  ice:              { src:'sprites/ice.svg',             fw:128, fh:30, tile:true, anims:{ idle:{row:0,frames:1,fps:1} } },
+  shock_platform:   { src:'sprites/shock_platform.svg',  fw:128, fh:30, tile:true, anims:{ idle:{row:0,frames:1,fps:1}, shocked:{row:0,frames:1,fps:1} } },
+  disappearing:     { src:'sprites/disappearing.svg',    fw:128, fh:30, tile:true, anims:{ idle:{row:0,frames:1,fps:1}, gone:{row:0,frames:1,fps:1} } },
+  flip_platform:    { src:'sprites/flip_platform.svg',   fw:128, fh:30, tile:true, anims:{ idle:{row:0,frames:1,fps:1}, flipped:{row:0,frames:1,fps:1} } },
+  elevator:         { src:'sprites/elevator.svg',        fw:80,  fh:30, anims:{ idle:{row:0,frames:1,fps:1}, moving:{row:0,frames:1,fps:1} } },
+  spike:            { src:'sprites/spike.svg',           fw:32,  fh:28, anims:{ idle:{row:0,frames:1,fps:1} } },
+  spring:           { src:'sprites/spring.svg',          fw:48,  fh:20, anims:{ idle:{row:0,frames:1,fps:1} } },
+  cannon:           { src:'sprites/cannon.svg',          fw:32,  fh:32, anims:{ idle:{row:0,frames:1,fps:1} } },
+  black_hole:       { src:'sprites/black_hole.svg',      fw:40,  fh:40, anims:{ spin:{row:0,frames:1,fps:1} } },
+  start_zone:       { src:'sprites/start_zone.svg',      fw:190, fh:30, anims:{ idle:{row:0,frames:1,fps:1} } },
+  end_zone:         { src:'sprites/end_zone.svg',        fw:190, fh:30, anims:{ idle:{row:0,frames:1,fps:1} } },
 };
 
 class SpriteLoader {
