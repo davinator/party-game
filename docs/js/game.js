@@ -1184,13 +1184,11 @@ class Game {
       const obj=this.placement.build(this.localId);
       this.level.add(obj);
       this.net.broadcast({ type:'place_object', obj });
-      if (this.phase==='build') {
-        lp.placementsLeft--;
-        if (lp.placementsLeft===0) {
-          lp._buildDone=true;
-          this.net.broadcast({ type:'build_done' });
-          if (this.isHost) this._checkAllBuildDone();
-        }
+      lp.placementsLeft--;
+      if (this.phase==='build' && lp.placementsLeft===0) {
+        lp._buildDone=true;
+        this.net.broadcast({ type:'build_done' });
+        if (this.isHost) this._checkAllBuildDone();
       }
       this._updateBuildPanel();
     });
