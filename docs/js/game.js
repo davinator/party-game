@@ -25,7 +25,7 @@ const RESULTS_TIME     = 8;
 const BUILD_PLACEMENTS = 2;
 
 const CAM_LERP = 0.1; // camera smoothing (lower = smoother/slower)
-const VERSION  = '0.1.27';
+const VERSION  = '0.1.28';
 
 const TEAM = {
   green: { primary: '#27ae60', light: '#2ecc71', name: 'Green Team' },
@@ -54,7 +54,9 @@ const SHOCK_PERIOD   = 4;   // seconds per shock cycle
 const SHOCK_ACTIVE   = 1;   // seconds the shock is lethal
 const VANISH_DELAY   = 0.7; // seconds after trigger before platform disappears
 const VANISH_RESET   = 3.0; // seconds before platform reappears
-const FLIP_PERIOD    = 3.0; // seconds per flip cycle (half platform, half spikes)
+const FLIP_SAFE      = 2.0; // seconds as platform
+const FLIP_DANGER    = 2.0; // seconds as spikes
+const FLIP_WARN      = 0.5; // seconds of warning flash before becoming spikes
 const ELEV_RISE      = 2.0; // seconds to travel up or down
 const ELEV_WAIT      = 1.0; // seconds to pause at top and bottom
 const CANNON_PERIOD  = 3.0; // seconds between shots
@@ -238,6 +240,7 @@ class GO {
     this.isEnd     = d.type === 'end_zone';
     this.shocked      = false; // shock_platform active state
     this._flipped     = false; // flip_platform: true = spike mode
+    this._flipWarning = false; // flip_platform: true = about to become spikes
     this._triggered   = false; // disappearing platform: has been stepped on
     this._triggerT    = 0;
     this._gone        = false; // disappearing platform: currently passable
@@ -273,7 +276,9 @@ class GO {
       this.shocked = (t % SHOCK_PERIOD) > (SHOCK_PERIOD - SHOCK_ACTIVE);
     }
     if (this.type === 'flip_platform') {
-      this._flipped = Math.floor(t / FLIP_PERIOD) % 2 === 1;
+      const phase = t % (FLIP_SAFE + FLIP_DANGER);
+      this._flipped = phase >= FLIP_SAFE;
+      this._flipWarning = !this._flipped && phase >= FLIP_SAFE - FLIP_WARN;
     }
     if (this.type === 'disappearing' && this._triggered) {
       const elapsed = t - this._triggerT;
@@ -316,7 +321,7 @@ class GO {
   _spriteAnim() {
     switch (this.type) {
       case 'shock_platform': return this.shocked   ? 'shocked'  : 'idle';
-      case 'flip_platform':  return this._flipped  ? 'flipped'  : 'idle';
+      case 'flip_platform':  return this._flipped ? 'flipped' : this._flipWarning ? 'warning' : 'idle';
       case 'disappearing':   return this._gone     ? 'gone'     : this._triggered ? 'warning' : 'idle';
       case 'elevator':       return this._triggered ? 'moving'  : 'idle';
       case 'conveyor':       return this.rotation===180 ? 'roll_rev' : 'roll';
@@ -449,9 +454,10 @@ class GO {
   }
 
   _dFlip(ctx, x, y, w, h) {
-    ctx.fillStyle = this._flipped ? '#e74c3c' : '#8e44ad';
+    const flashOn = this._flipWarning && Math.floor(performance.now() / 120) % 2 === 0;
+    ctx.fillStyle = this._flipped ? '#e74c3c' : flashOn ? '#e74c3c' : '#8e44ad';
     ctx.fillRect(x, y, w, h);
-    this._label(ctx, x, y, w, h, this._flipped ? 'SPIKE' : 'FLIP');
+    this._label(ctx, x, y, w, h, this._flipped ? 'SPIKE' : this._flipWarning ? 'WARN!' : 'FLIP');
   }
 
   _dDisappearing(ctx, x, y, w, h) {
@@ -1651,11 +1657,23 @@ class Game {
       const olR = (p.x+PW) - lp.x;
       const olU = (lp.y+PH) - p.y;
       const olD = (p.y+PH) - lp.y;
-      const min = Math.min(olL, olR, olU, olD);
-      if      (min === olL) { lp.x -= olL; if (lp.vx > 0) lp.vx *= 0.3; }
-      else if (min === olR) { lp.x += olR; if (lp.vx < 0) lp.vx *= 0.3; }
-      else if (min === olU) { lp.y -= olU; if (lp.vy > 0) { lp.vy = 0; lp.onGround = true; } }
-      else                  { lp.y += olD; if (lp.vy < 0) lp.vy = 0; }
+      const minH = Math.min(olL, olR);
+      const minV = Math.min(olU, olD);
+      // Give vertical resolution a 6px bias so landing from above is reliable
+      if (minV <= minH + 6) {
+        if (olU < olD) {
+          // Landing on top of a player
+          lp.y -= olU;
+          if (lp.vy >= 0) { lp.vy = 0; lp.onGround = true; }
+        } else {
+          // Bumping head on a player from below
+          lp.y += olD;
+          if (lp.vy < 0) lp.vy = 0;
+        }
+      } else {
+        if (olL < olR) { lp.x -= olL; if (lp.vx > 0) lp.vx *= 0.3; }
+        else           { lp.x += olR; if (lp.vx < 0) lp.vx *= 0.3; }
+      }
     }
   }
 
