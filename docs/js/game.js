@@ -26,7 +26,7 @@ const RESULTS_TIME     = 8;
 const BUILD_PLACEMENTS = 2;
 
 const CAM_LERP = 0.1; // camera smoothing (lower = smoother/slower)
-const VERSION  = '0.1.32';
+const VERSION  = '0.1.33';
 
 const TEAM = {
   green: { primary: '#27ae60', light: '#2ecc71', name: 'Green Team' },
@@ -76,14 +76,14 @@ const PALETTE = [
 //  BASE LEVEL  (wider world, more platforms)
 // ─────────────────────────────────────────────
 const BASE_LEVEL = [
-  { id:'bl_start', type:'platform',   x:40,   y:730, w:240, h:30, permanent:true },
-  { id:'bl_m1',    type:'platform',   x:480,  y:650, w:160, h:30, permanent:true },
-  { id:'bl_m2',    type:'platform',   x:900,  y:600, w:160, h:30, permanent:true },
-  { id:'bl_m3',    type:'platform',   x:1350, y:660, w:160, h:30, permanent:true },
-  { id:'bl_m4',    type:'platform',   x:1800, y:580, w:160, h:30, permanent:true },
-  { id:'bl_m5',    type:'platform',   x:2250, y:630, w:160, h:30, permanent:true },
-  { id:'bl_m6',    type:'platform',   x:2680, y:590, w:160, h:30, permanent:true },
-  { id:'bl_end',   type:'platform',   x:2900, y:690, w:240, h:30, permanent:true },
+  { id:'bl_start', type:'platform',   x:32,   y:730, w:256, h:30, permanent:true },
+  { id:'bl_m1',    type:'platform',   x:496,  y:650, w:128, h:30, permanent:true },
+  { id:'bl_m2',    type:'platform',   x:916,  y:600, w:128, h:30, permanent:true },
+  { id:'bl_m3',    type:'platform',   x:1366, y:660, w:128, h:30, permanent:true },
+  { id:'bl_m4',    type:'platform',   x:1816, y:580, w:128, h:30, permanent:true },
+  { id:'bl_m5',    type:'platform',   x:2266, y:630, w:128, h:30, permanent:true },
+  { id:'bl_m6',    type:'platform',   x:2696, y:590, w:128, h:30, permanent:true },
+  { id:'bl_end',   type:'platform',   x:2892, y:690, w:256, h:30, permanent:true },
   { id:'bl_sz',    type:'start_zone', x:58,   y:700, w:190, h:30 },
   { id:'bl_ez',    type:'end_zone',   x:2920, y:660, w:190, h:30 },
 ];
@@ -95,21 +95,21 @@ const WAITING_LEVEL = [
   // Full-width floor — falling is impossible
   { id:'wf',   type:'platform', x:0,    y:820, w:WORLD_W, h:80, permanent:true },
   // Left beginner section
-  { id:'wp1',  type:'platform', x:180,  y:540, w:180, h:30, permanent:true },
-  { id:'wp2',  type:'platform', x:460,  y:460, w:140, h:30, permanent:true },
-  { id:'wp3',  type:'platform', x:720,  y:380, w:120, h:30, permanent:true },
-  { id:'wp4',  type:'platform', x:960,  y:460, w:160, h:30, permanent:true },
+  { id:'wp1',  type:'platform', x:206,  y:540, w:128, h:30, permanent:true },
+  { id:'wp2',  type:'platform', x:466,  y:460, w:128, h:30, permanent:true },
+  { id:'wp3',  type:'platform', x:716,  y:380, w:128, h:30, permanent:true },
+  { id:'wp4',  type:'platform', x:976,  y:460, w:128, h:30, permanent:true },
   // Staircase section
-  { id:'ws1',  type:'platform', x:1200, y:560, w:110, h:30, permanent:true },
-  { id:'ws2',  type:'platform', x:1360, y:480, w:110, h:30, permanent:true },
-  { id:'ws3',  type:'platform', x:1520, y:400, w:110, h:30, permanent:true },
-  { id:'ws4',  type:'platform', x:1680, y:320, w:110, h:30, permanent:true },
+  { id:'ws1',  type:'platform', x:1191, y:560, w:128, h:30, permanent:true },
+  { id:'ws2',  type:'platform', x:1351, y:480, w:128, h:30, permanent:true },
+  { id:'ws3',  type:'platform', x:1511, y:400, w:128, h:30, permanent:true },
+  { id:'ws4',  type:'platform', x:1671, y:320, w:128, h:30, permanent:true },
   // Wide landing
-  { id:'wp5',  type:'platform', x:1900, y:490, w:280, h:30, permanent:true },
+  { id:'wp5',  type:'platform', x:1912, y:490, w:256, h:30, permanent:true },
   // Right section
-  { id:'wp6',  type:'platform', x:2280, y:410, w:180, h:30, permanent:true },
-  { id:'wp7',  type:'platform', x:2560, y:510, w:160, h:30, permanent:true },
-  { id:'wp8',  type:'platform', x:2820, y:430, w:200, h:30, permanent:true },
+  { id:'wp6',  type:'platform', x:2306, y:410, w:128, h:30, permanent:true },
+  { id:'wp7',  type:'platform', x:2576, y:510, w:128, h:30, permanent:true },
+  { id:'wp8',  type:'platform', x:2792, y:430, w:256, h:30, permanent:true },
   // Springs for fun
   { id:'wsp1', type:'spring', x:370,  y:800, w:48, h:20, permanent:true },
   { id:'wsp2', type:'spring', x:1820, y:800, w:48, h:20, permanent:true },
@@ -142,7 +142,7 @@ function circleRect(cx,cy,r, rx,ry,rw,rh) {
 const SPRITE_MANIFEST = {
   player_green:     { src:'sprites/player_green.png',     fw:26,   fh:40,  anims:{ idle:{row:0,frames:1,fps:1}, walk:{row:1,frames:4,fps:10}, jump:{row:2,frames:1,fps:1}, fall:{row:3,frames:1,fps:1}, ghost:{row:4,frames:4,fps:6}, finished:{row:5,frames:4,fps:6} } },
   player_blue:      { src:'sprites/player_blue.png',      fw:26,   fh:40,  anims:{ idle:{row:0,frames:1,fps:1}, walk:{row:1,frames:4,fps:10}, jump:{row:2,frames:1,fps:1}, fall:{row:3,frames:1,fps:1}, ghost:{row:4,frames:4,fps:6}, finished:{row:5,frames:4,fps:6} } },
-  platform:         { src:'sprites/platform.png',         fw:1024, fh:156, anims:{ idle:{row:0,frames:1,fps:1} } },
+  platform:         { src:'sprites/platform_tile.svg',    fw:128,  fh:30,  tile:true, anims:{ idle:{row:0,frames:1,fps:1} } },
   moving_platform:  { src:'sprites/moving_platform.png',  fw:1024, fh:154, anims:{ idle:{row:0,frames:1,fps:1} } },
   conveyor:         { src:'sprites/conveyor.png',         fw:256,  fh:77,  anims:{ roll:{row:0,frames:4,fps:8}, roll_rev:{row:1,frames:4,fps:8} } },
   ice:              { src:'sprites/ice.png',              fw:1024, fh:154, anims:{ idle:{row:0,frames:1,fps:1} } },
@@ -150,8 +150,8 @@ const SPRITE_MANIFEST = {
   disappearing:     { src:'sprites/disappearing.png',     fw:1024, fh:156, anims:{ idle:{row:0,frames:1,fps:1}, gone:{row:1,frames:1,fps:1} } },
   flip_platform:    { src:'sprites/flip_platform.png',    fw:1024, fh:156, anims:{ idle:{row:0,frames:1,fps:1}, flipped:{row:1,frames:1,fps:1} } },
   elevator:         { src:'sprites/elevator.png',         fw:640,  fh:160, anims:{ idle:{row:0,frames:1,fps:1}, moving:{row:1,frames:1,fps:1} } },
-  spike:            { src:'sprites/spike.png',            fw:256,  fh:191, anims:{ idle:{row:0,frames:1,fps:1} } },
-  spring:           { src:'sprites/spring.png',           fw:192,  fh:84,  anims:{ idle:{row:0,frames:1,fps:1}, triggered:{row:1,frames:4,fps:12} } },
+  spike:            { src:'sprites/spike.svg',            fw:32,   fh:28,  anims:{ idle:{row:0,frames:1,fps:1} } },
+  spring:           { src:'sprites/spring.svg',           fw:48,   fh:20,  anims:{ idle:{row:0,frames:1,fps:1} } },
   cannon:           { src:'sprites/cannon.png',           fw:256,  fh:256, anims:{ idle:{row:0,frames:1,fps:1} } },
   black_hole:       { src:'sprites/black_hole.png',       fw:160,  fh:160, anims:{ spin:{row:0,frames:4,fps:12} } },
   start_zone:       { src:'sprites/start_zone.png',       fw:760,  fh:128, anims:{ idle:{row:0,frames:1,fps:1} } },
@@ -183,6 +183,15 @@ class SpriteLoader {
       ? Math.floor(performance.now() / 1000 * a.fps) % a.frames
       : 0;
     const sx = frame * def.fw, sy = (a.row ?? 0) * def.fh;
+    // Tiled sprites: repeat the tile across the full width
+    if (def.tile) {
+      const tw = def.fw;
+      for (let tx = x; tx < x + w; tx += tw) {
+        const dw = Math.min(tw, x + w - tx);
+        ctx.drawImage(img, sx, sy, dw / tw * def.fw, def.fh, tx, y, dw, h);
+      }
+      return true;
+    }
     if (flipX) {
       ctx.save();
       ctx.translate(x + w, y); ctx.scale(-1, 1);
@@ -419,10 +428,9 @@ class GO {
   }
 
   _dSpike(ctx, x, y, w, h) {
-    const tc = this.team ? TEAM[this.team] : null;
     ctx.fillStyle='#444';
     ctx.fillRect(x, y+h-5, w, 5);
-    ctx.fillStyle = tc ? tc.light : '#bdc3c7';
+    ctx.fillStyle='#bdc3c7';
     const n = Math.floor(w/16);
     for (let i=0;i<n;i++) {
       const sx = x+i*16+8;
@@ -435,16 +443,9 @@ class GO {
   }
 
   _dSpring(ctx, x, y, w, h) {
-    const tc = this.team ? TEAM[this.team] : null;
     ctx.fillStyle='#444'; ctx.fillRect(x, y+h-5, w, 5);
-    ctx.fillStyle = tc ? tc.primary : '#e67e22';
-    ctx.fillRect(x+4, y+4, w-8, h-9);
+    ctx.fillStyle='#e67e22'; ctx.fillRect(x+4, y+4, w-8, h-9);
     ctx.fillStyle='#f39c12'; ctx.fillRect(x+4, y, w-8, 5);
-    ctx.strokeStyle='rgba(255,255,255,0.3)'; ctx.lineWidth=1;
-    for (let i=1;i<3;i++) {
-      const ly = y+4+i*((h-9)/3);
-      ctx.beginPath(); ctx.moveTo(x+4,ly); ctx.lineTo(x+w-4,ly); ctx.stroke();
-    }
   }
 
   _dConveyor(ctx, x, y, w, h) {
