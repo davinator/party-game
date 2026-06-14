@@ -601,13 +601,14 @@ class Player {
     this._coyote=0; this._jbuf=0; this.ghostMode=false;
   }
 
-  updateLocal(inp, level, placementActive=false) {
+  updateLocal(inp, level, placementActive=false, mirrorControls=true) {
     if (this.state==='finished') return null;
 
-    // Blue team's screen is horizontally mirrored — invert left/right
+    // Blue team's screen is horizontally mirrored — invert left/right (skip in waiting room)
     const isBlue = this.team === 'blue';
-    const goLeft  = isBlue ? inp.right : inp.left;
-    const goRight = isBlue ? inp.left  : inp.right;
+    const mirror = isBlue && mirrorControls;
+    const goLeft  = mirror ? inp.right : inp.left;
+    const goRight = mirror ? inp.left  : inp.right;
 
     const { solids, hazards, springs, endZone, startZone, blackHoles } = level;
 
@@ -1406,6 +1407,11 @@ class Game {
 
     net.on('player_joined', msg=>{
       this._addPlayer(msg.playerId, msg.name, msg.team, msg.colorIdx);
+      // If a player joins mid-game, keep them as a ghost spectator until the next build phase
+      if (this.phase !== 'waiting' && this.phase !== 'lobby') {
+        const p = this.players[msg.playerId];
+        if (p) { p.state='dead'; p.ghostMode=true; p._buildDone=true; }
+      }
     });
 
     net.on('state_sync', msg=>{
@@ -1422,6 +1428,9 @@ class Game {
         this.level.load(msg.objects);
         this.phase=msg.phase; this.timer=msg.timer;
         this._enterGame();
+        // Late join: spectate as ghost until the next build phase resets everyone
+        const lp = this.localPlayer;
+        if (lp) { lp.state='dead'; lp.ghostMode=true; lp.placementsLeft=0; lp._buildDone=true; }
       }
     });
 
@@ -1680,7 +1689,7 @@ class Game {
       this._phaseTime += 1/60;
       this.level.update(this._phaseTime);
       const lp = this.localPlayer;
-      if (lp) lp.updateLocal(this.input, this.level, false);
+      if (lp) lp.updateLocal(this.input, this.level, false, false);
       for (const p of Object.values(this.players)) {
         if (p.id !== this.localId) p.updateRemote(this.level.solids);
       }
