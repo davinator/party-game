@@ -25,7 +25,7 @@ const RESULTS_TIME     = 8;
 const BUILD_PLACEMENTS = 2;
 
 const CAM_LERP = 0.1; // camera smoothing (lower = smoother/slower)
-const VERSION  = '0.1.29';
+const VERSION  = '0.1.30';
 
 const TEAM = {
   green: { primary: '#27ae60', light: '#2ecc71', name: 'Green Team' },
@@ -870,18 +870,26 @@ class Renderer {
       }
     } else {
       const g=c.createLinearGradient(0,0,0,vh);
-      g.addColorStop(0,'#0d0d1a'); g.addColorStop(1,'#131328');
+      g.addColorStop(0,'#5DADE2'); g.addColorStop(0.6,'#A9D4F5'); g.addColorStop(1,'#D5EAF8');
       c.fillStyle=g; c.fillRect(0,0,vw,vh);
-      c.fillStyle='rgba(255,255,255,0.45)';
-      const sx = camX * 0.08;
-      for (let i=0;i<80;i++) {
-        const px = ((i*173.7 - sx) % vw + vw) % vw;
-        const py = (i*97.3) % (vh*0.75);
-        c.fillRect(px|0, py|0, 1, 1);
+      // Parallax clouds
+      const cx = camX * 0.12;
+      c.fillStyle='rgba(255,255,255,0.88)';
+      for (let i=0;i<14;i++) {
+        const bx = ((i*317.3 - cx) % (vw+500) + vw+500) % (vw+500) - 250;
+        const by = 30 + (i*71.9) % (vh*0.42);
+        const rw = 60 + (i*53.1) % 110, rh = 18 + (i*29.7) % 22;
+        c.beginPath();
+        c.ellipse(bx,        by,        rw,       rh,       0,0,Math.PI*2);
+        c.ellipse(bx-rw*0.4, by+rh*0.2, rw*0.58,  rh*0.72,  0,0,Math.PI*2);
+        c.ellipse(bx+rw*0.38,by+rh*0.18,rw*0.52,  rh*0.68,  0,0,Math.PI*2);
+        c.fill();
       }
     }
-    c.fillStyle='rgba(200,0,0,0.07)';
-    c.fillRect(0, vh-40, vw, 40);
+    // Death-zone warm glow
+    const dg=c.createLinearGradient(0,vh-70,0,vh);
+    dg.addColorStop(0,'rgba(210,60,0,0)'); dg.addColorStop(1,'rgba(210,60,0,0.28)');
+    c.fillStyle=dg; c.fillRect(0,vh-70,vw,70);
   }
 
   drawHUD(game) {
@@ -1735,7 +1743,7 @@ class Game {
 
     // ── Version watermark (screen-space) ──
     ctx.font='10px monospace'; ctx.textAlign='right';
-    ctx.fillStyle='rgba(255,255,255,0.25)';
+    ctx.fillStyle='rgba(0,0,0,0.22)';
     ctx.fillText('v'+VERSION, vw-8, vh-8);
 
     // ── Screen-space HUD / overlays ──
