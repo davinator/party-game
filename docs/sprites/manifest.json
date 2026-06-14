@@ -26,17 +26,17 @@
 
   "platform": {
     "src": "sprites/platform.png",
-    "fw": 128, "fh": 20,
+    "fw": 1024, "fh": 156,
     "anims": { "idle": { "row": 0, "frames": 1, "fps": 1 } }
   },
   "moving_platform": {
     "src": "sprites/moving_platform.png",
-    "fw": 128, "fh": 20,
+    "fw": 1024, "fh": 154,
     "anims": { "idle": { "row": 0, "frames": 1, "fps": 1 } }
   },
   "conveyor": {
     "src": "sprites/conveyor.png",
-    "fw": 128, "fh": 20,
+    "fw": 256, "fh": 77,
     "anims": {
       "roll":     { "row": 0, "frames": 4, "fps": 8 },
       "roll_rev": { "row": 1, "frames": 4, "fps": 8 }
@@ -44,12 +44,12 @@
   },
   "ice": {
     "src": "sprites/ice.png",
-    "fw": 128, "fh": 14,
+    "fw": 1024, "fh": 154,
     "anims": { "idle": { "row": 0, "frames": 1, "fps": 1 } }
   },
   "shock_platform": {
     "src": "sprites/shock_platform.png",
-    "fw": 128, "fh": 20,
+    "fw": 256, "fh": 78,
     "anims": {
       "idle":    { "row": 0, "frames": 1, "fps": 1  },
       "shocked": { "row": 1, "frames": 4, "fps": 12 }
@@ -57,16 +57,15 @@
   },
   "disappearing": {
     "src": "sprites/disappearing.png",
-    "fw": 128, "fh": 20,
+    "fw": 1024, "fh": 156,
     "anims": {
-      "idle":    { "row": 0, "frames": 1, "fps": 1  },
-      "warning": { "row": 1, "frames": 4, "fps": 10 },
-      "gone":    { "row": 2, "frames": 1, "fps": 1  }
+      "idle": { "row": 0, "frames": 1, "fps": 1 },
+      "gone": { "row": 1, "frames": 1, "fps": 1 }
     }
   },
   "flip_platform": {
     "src": "sprites/flip_platform.png",
-    "fw": 128, "fh": 20,
+    "fw": 1024, "fh": 156,
     "anims": {
       "idle":    { "row": 0, "frames": 1, "fps": 1 },
       "flipped": { "row": 1, "frames": 1, "fps": 1 }
@@ -82,15 +81,15 @@
   },
   "spike": {
     "src": "sprites/spike.png",
-    "fw": 32, "fh": 24,
+    "fw": 256, "fh": 191,
     "anims": { "idle": { "row": 0, "frames": 1, "fps": 1 } }
   },
   "spring": {
     "src": "sprites/spring.png",
-    "fw": 48, "fh": 16,
+    "fw": 192, "fh": 84,
     "anims": {
       "idle":      { "row": 0, "frames": 1, "fps": 1  },
-      "triggered": { "row": 1, "frames": 3, "fps": 12 }
+      "triggered": { "row": 1, "frames": 4, "fps": 12 }
     }
   },
   "cannon": {
