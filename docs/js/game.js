@@ -1218,8 +1218,9 @@ class Game {
     document.getElementById('join-btn').addEventListener('click', ()=>{
       const name   = (document.getElementById('player-name').value||'').trim()||'Player';
       const room   = (document.getElementById('room-code').value||'').trim()||'default';
-      const server = (document.getElementById('server-addr').value||'').trim()||'localhost:8080';
-      this._join(`ws://${server}`, room, name, selectedTeam);
+      let server = (document.getElementById('server-addr').value||'').trim()||'localhost:8080';
+      server = server.includes('://') ? server.replace(/[a-zA-Z]*\:\/\/?/, '') : server
+      this._join(`wss://${server}`, room, name, selectedTeam);
     });
 
     document.getElementById('start-btn').addEventListener('click', ()=>{
