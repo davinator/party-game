@@ -207,6 +207,20 @@
       margin-top: 6px;
       letter-spacing: 1px;
     }
+
+    #reconnect-banner {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      padding: 8px 16px;
+      background: #c0392b;
+      color: #fff;
+      text-align: center;
+      font-size: 0.78rem;
+      font-family: 'Courier New', monospace;
+      z-index: 300;
+      letter-spacing: 0.5px;
+    }
+    #reconnect-banner.hidden { display: none; }
   </style>
 </head>
 <body>
@@ -215,7 +229,7 @@
   <div class="panel">
     <h1>PARTY PLATFORMER</h1>
     <p class="subtitle">Multiplayer chaos — die, then make it harder for everyone else</p>
-    <p class="version-tag">v0.1.36</p>
+    <p class="version-tag">v0.1.37</p>
 
     <!-- Connect form -->
     <div id="connect-form">
@@ -248,6 +262,7 @@
 </div>
 
 <canvas id="canvas"></canvas>
+<div id="reconnect-banner" class="hidden"><span id="reconnect-msg"></span></div>
 
 <!-- ── GAME HUD ── -->
 <div id="game-hud" class="hidden">

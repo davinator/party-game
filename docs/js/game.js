@@ -875,20 +875,50 @@ class Placement {
 //  NETWORK
 // ─────────────────────────────────────────────
 class Net {
-  constructor() { this.ws=null; this.handlers={}; this.playerId=null; this.connected=false; }
+  constructor() {
+    this.ws=null; this.handlers={}; this.playerId=null; this.connected=false;
+    this._url=null; this._joinMsg=null;
+    this._retrying=false; this._retryDelay=1000; this._retryTimer=null;
+  }
 
   connect(url, playerId, roomId, info) {
+    this._url=url; this._joinMsg={type:'join',playerId,roomId,...info};
     this.playerId=playerId;
+    this._retrying=false;
     return new Promise((resolve,reject) => {
-      this.ws=new WebSocket(url);
-      this.ws.onopen=()=>{ this.connected=true; this._send({type:'join',playerId,roomId,...info}); resolve(); };
-      this.ws.onerror=e=>reject(e);
-      this.ws.onclose=()=>{ this.connected=false; this._emit('disconnected',{}); };
-      this.ws.onmessage=e=>{ let m; try{m=JSON.parse(e.data);}catch{return;} this._emit(m.type,m); };
+      let settled=false;
+      const ws = this.ws = new WebSocket(url);
+      ws.onopen=()=>{ settled=true; this.connected=true; this._retryDelay=1000; this._send(this._joinMsg); resolve(); };
+      ws.onerror=e=>{ if(!settled){ settled=true; reject(e); } };
+      ws.onclose=()=>{
+        this.connected=false;
+        if(!settled){ settled=true; reject(new Error('Connection closed')); return; }
+        if(this._retrying) this._scheduleReconnect();
+        else this._emit('disconnected',{});
+      };
+      ws.onmessage=e=>{ let m; try{m=JSON.parse(e.data);}catch{return;} this._emit(m.type,m); };
     });
   }
 
-  _send(msg) { if (this.ws&&this.ws.readyState===WebSocket.OPEN) this.ws.send(JSON.stringify(msg)); }
+  _scheduleReconnect() {
+    this._emit('reconnecting',{delay:this._retryDelay});
+    this._retryTimer=setTimeout(()=>this._attempt(), this._retryDelay);
+    this._retryDelay=Math.min(this._retryDelay*2, 30000);
+  }
+
+  _attempt() {
+    if(!this._retrying) return;
+    const ws = this.ws = new WebSocket(this._url);
+    ws.onopen=()=>{ this.connected=true; this._retryDelay=1000; this._send(this._joinMsg); this._emit('reconnected',{}); };
+    ws.onerror=()=>{};
+    ws.onclose=()=>{ this.connected=false; if(this._retrying) this._scheduleReconnect(); };
+    ws.onmessage=e=>{ let m; try{m=JSON.parse(e.data);}catch{return;} this._emit(m.type,m); };
+  }
+
+  startRetrying() { this._retrying=true; }
+  stopRetrying()  { this._retrying=false; clearTimeout(this._retryTimer); }
+
+  _send(msg) { if(this.ws&&this.ws.readyState===WebSocket.OPEN) this.ws.send(JSON.stringify(msg)); }
   broadcast(msg) { this._send(msg); }
   sendTo(pid,msg) { this._send({...msg,to:pid}); }
   on(type,fn) { (this.handlers[type]=this.handlers[type]||[]).push(fn); return this; }
@@ -1421,7 +1451,15 @@ class Game {
       if (this.phase==='lobby') document.getElementById('start-btn').style.display='block';
     });
 
-    net.on('disconnected', ()=>alert('Disconnected from server.'));
+    this.net.startRetrying();
+    const _banner=document.getElementById('reconnect-banner');
+    const _bannerMsg=document.getElementById('reconnect-msg');
+    net.on('reconnecting',({delay})=>{
+      _banner.classList.remove('hidden');
+      _bannerMsg.textContent=`Connection lost — reconnecting in ${Math.round(delay/1000)}s…`;
+    });
+    net.on('reconnected',()=>{ _banner.classList.add('hidden'); });
+    net.on('disconnected',()=>{ _banner.classList.remove('hidden'); _bannerMsg.textContent='Disconnected from server.'; });
   }
 
   _addPlayer(id,name,team,colorIdx) {
