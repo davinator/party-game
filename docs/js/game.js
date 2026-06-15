@@ -861,7 +861,8 @@ class Player {
     const ay = y - hoverY;  // vertically adjusted origin
 
     // ── Legs ──
-    let llX = x+5, lrX = x+15, legY = ay+27;
+    let llX = x+5, lrX = x+15;
+    let llY = ay+27, lrY = ay+27;
     let llH = 13, lrH = 13;
 
     if (dancing) {
@@ -870,21 +871,21 @@ class Player {
     } else if (falling) {
       llX = x+3; lrX = x+17; llH = 11; lrH = 11;  // legs spread in fall
     } else if (!inAir) {
-      // Stride: legs swing forward/back (X offset) instead of height change
-      llX = x+5 + Math.round(sw * 3);
-      lrX = x+15 - Math.round(sw * 3);
+      // Lift each leg as it swings forward — whole leg shifts up, no spreading
+      llY = ay+27 - Math.round(Math.max(0,  sw) * 5);
+      lrY = ay+27 - Math.round(Math.max(0, -sw) * 5);
     }
 
     // White outline behind legs for visibility when crossing body
     ctx.fillStyle = 'rgba(255,255,255,0.4)';
-    ctx.fillRect(llX-1, legY-1, 8, llH+2);
-    ctx.fillRect(lrX-1, legY-1, 8, lrH+2);
+    ctx.fillRect(llX-1, llY-1, 8, llH+2);
+    ctx.fillRect(lrX-1, lrY-1, 8, lrH+2);
     ctx.fillStyle = tc.primary;
-    ctx.fillRect(llX, legY, 6, Math.max(4, llH));
-    ctx.fillRect(lrX, legY, 6, Math.max(4, lrH));
+    ctx.fillRect(llX, llY, 6, Math.max(4, llH));
+    ctx.fillRect(lrX, lrY, 6, Math.max(4, lrH));
     ctx.fillStyle = tc.light;
-    ctx.fillRect(llX, legY, 6, 2);
-    ctx.fillRect(lrX, legY, 6, 2);
+    ctx.fillRect(llX, llY, 6, 2);
+    ctx.fillRect(lrX, lrY, 6, 2);
 
     // ── Torso ──
     ctx.fillStyle = tc.primary;
@@ -902,8 +903,9 @@ class Player {
     } else if (falling) {
       laY = ay+3; raY = ay+3; armH = 14;  // arms fly up when falling
     } else if (!inAir) {
-      laY = ay+13 - Math.round(sw * 4);   // swing opposite to legs
-      raY = ay+13 + Math.round(sw * 4);
+      // Right arm leads forward when left leg steps (natural opposition)
+      laY = ay+13 + Math.round(sw * 3);
+      raY = ay+13 - Math.round(sw * 3);
     }
 
     // White outline behind arms
@@ -2110,11 +2112,18 @@ class Game {
           // Currently dying / lying — controls frozen, timer ticking via the global loop above
         } else {
           const evt = lp.updateLocal(this.input, this.level, false, false);
-          if (evt && evt.startsWith('died')) {
-            lp._deathCause = evt.startsWith('died:') ? evt.slice(5) : 'fall';
+          const hitByProjectile = this.level.projectilesAt(this._phaseTime)
+            .some(p => circleRect(p.x, p.y, p.r, lp.x, lp.y, PW, PH));
+          const cause = hitByProjectile ? 'projectile'
+            : (evt && evt.startsWith('died:') ? evt.slice(5) : 'fall');
+          if (hitByProjectile || (evt && evt.startsWith('died'))) {
+            lp._deathCause = cause;
             lp._deathX = lp.x; lp._deathY = lp.y;
             lp._deathFloorY = this.level.floorBelow(lp._deathX, lp._deathY);
-            lp._deathProjFloorY = null;
+            if (cause === 'projectile') {
+              const projLandX = lp._deathX + (-lp.facing * 3.0) * (2 * 8.0 / GRAVITY);
+              lp._deathProjFloorY = this.level.floorBelow(projLandX, lp._deathY);
+            } else { lp._deathProjFloorY = null; }
             lp._deathT = 0;
           }
         }
