@@ -325,12 +325,23 @@ class GO {
       const phase = t % (FLIP_SAFE + FLIP_DANGER);
       this._flipped = phase >= FLIP_SAFE;
       this._flipWarning = !this._flipped && phase >= FLIP_SAFE - FLIP_WARN;
+      if (this._flipped) { this._flipAngle = Math.PI; }
+      else if (this._flipWarning) { this._flipAngle = ((phase-(FLIP_SAFE-FLIP_WARN))/FLIP_WARN)*Math.PI; }
+      else { this._flipAngle = 0; }
     }
     if (this.type === 'disappearing' && this._triggered) {
       const elapsed = t - this._triggerT;
       this._gone = elapsed >= VANISH_DELAY && elapsed < VANISH_RESET;
       if (elapsed >= VANISH_RESET) { this._triggered = false; this._gone = false; }
+      this._shakeX = (elapsed < VANISH_DELAY)
+        ? Math.round(Math.sin(elapsed * 55) * (elapsed / VANISH_DELAY) * 3) : 0;
     }
+    if (this.type === 'cannon') {
+      this._firePhase = t - Math.floor(t / CANNON_PERIOD) * CANNON_PERIOD;
+    }
+    if (this.type === 'black_hole') { this._spinAngle = t * 1.5; }
+    if (this.type === 'conveyor')   { this._scrollT = (t * CONVEYOR_SPEED * 2) % 18; }
+    if (this.type === 'spring')     { this._compressed = (this._compressTill != null && t < this._compressTill); }
     if (this.type === 'elevator') {
       const CYCLE = ELEV_RISE*2 + ELEV_WAIT*2;
       const e = t % CYCLE;
@@ -392,8 +403,8 @@ class GO {
       case 'elevator':        this._dElevator(ctx,x,y,w,h);               break;
       case 'cannon':          this._dCannon(ctx,x,y,w,h);                 break;
       case 'black_hole':      this._dBlackHole(ctx,x,y,w,h);             break;
-      case 'start_zone':      this._dZone(ctx,x,y,w,h,'#2ecc71','GRN START','BLU FINISH'); break;
-      case 'end_zone':        this._dZone(ctx,x,y,w,h,'#f1c40f','GRN FINISH','BLU START'); break;
+      case 'start_zone':      this._dZone(ctx,x,y,w,h,'#2ecc71','#3498db'); break;
+      case 'end_zone':        this._dZone(ctx,x,y,w,h,'#3498db','#2ecc71'); break;
     }
   }
 
@@ -466,14 +477,41 @@ class GO {
   }
 
   _dSpring(ctx, x, y, w, h) {
-    ctx.fillStyle='#444'; ctx.fillRect(x, y+h-5, w, 5);
-    ctx.fillStyle='#e67e22'; ctx.fillRect(x+4, y+4, w-8, h-9);
-    ctx.fillStyle='#f39c12'; ctx.fillRect(x+4, y, w-8, 5);
+    ctx.fillStyle = '#444'; ctx.fillRect(x, y+h-5, w, 5);
+    if (this._compressed) {
+      const top = y + Math.round(h * 0.55);
+      ctx.fillStyle = '#e67e22'; ctx.fillRect(x+4, top, w-8, h-5-top+y);
+      ctx.fillStyle = '#f39c12'; ctx.fillRect(x+4, top, w-8, 4);
+      ctx.strokeStyle = '#f39c12'; ctx.lineWidth = 1.5;
+      for (let i = 0; i < 3; i++) {
+        const ly = top + 6 + i * 5;
+        ctx.beginPath(); ctx.moveTo(x+6, ly); ctx.lineTo(x+w-6, ly); ctx.stroke();
+      }
+    } else {
+      ctx.fillStyle = '#e67e22'; ctx.fillRect(x+4, y+4, w-8, h-9);
+      ctx.fillStyle = '#f39c12'; ctx.fillRect(x+4, y, w-8, 5);
+      ctx.strokeStyle = 'rgba(243,156,18,0.6)'; ctx.lineWidth = 1.5;
+      const coilH = Math.round((h-10) / 4);
+      for (let i = 0; i < 4; i++) {
+        const ly = y + 6 + i * coilH;
+        ctx.beginPath(); ctx.moveTo(x+6, ly); ctx.lineTo(x+w-6, ly); ctx.stroke();
+      }
+    }
   }
 
   _dConveyor(ctx, x, y, w, h) {
-    ctx.fillStyle='#e67e22'; ctx.fillRect(x, y, w, h);
-    this._label(ctx, x, y, w, h, 'CONV');
+    ctx.fillStyle = '#c0392b'; ctx.fillRect(x, y, w, h);
+    const offset = (this._scrollT || 0);
+    ctx.save();
+    ctx.beginPath(); ctx.rect(x, y, w, h); ctx.clip();
+    ctx.strokeStyle = 'rgba(0,0,0,0.35)'; ctx.lineWidth = 3;
+    const step = 18;
+    for (let lx = x - h + (offset % step); lx < x + w + step; lx += step) {
+      ctx.beginPath(); ctx.moveTo(lx, y); ctx.lineTo(lx - h, y + h); ctx.stroke();
+    }
+    ctx.restore();
+    ctx.fillStyle = '#922b21';
+    ctx.fillRect(x, y, 4, h); ctx.fillRect(x+w-4, y, 4, h);
   }
 
   _dIce(ctx, x, y, w, h) {
@@ -484,6 +522,22 @@ class GO {
   _dShock(ctx, x, y, w, h) {
     ctx.fillStyle = this.shocked ? '#fff176' : '#546e7a';
     ctx.fillRect(x, y, w, h);
+    if (this.shocked) {
+      ctx.fillStyle = '#ffee58'; ctx.fillRect(x, y, w, 3);
+      const frame = Math.floor(performance.now() / 70);
+      for (let i = 0; i < 4; i++) {
+        const seed = frame * 19 + i * 41;
+        const bx = x + 8 + ((seed * 31) % Math.max(1, w - 16));
+        const bh = 5 + ((seed * 13) % 8);
+        ctx.strokeStyle = i % 2 === 0 ? '#fffde7' : '#f9a825';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(bx, y);
+        ctx.lineTo(bx + ((seed * 7) % 7) - 3, y - bh * 0.5);
+        ctx.lineTo(bx + ((seed * 11) % 6) - 3, y - bh);
+        ctx.stroke();
+      }
+    }
     this._label(ctx, x, y, w, h, 'ZAP');
   }
 
@@ -493,16 +547,37 @@ class GO {
   }
 
   _dFlip(ctx, x, y, w, h) {
-    const flashOn = this._flipWarning && Math.floor(performance.now() / 120) % 2 === 0;
-    ctx.fillStyle = this._flipped ? '#e74c3c' : flashOn ? '#e74c3c' : '#8e44ad';
-    ctx.fillRect(x, y, w, h);
-    this._label(ctx, x, y, w, h, this._flipped ? 'SPIKE' : this._flipWarning ? 'WARN!' : 'FLIP');
+    const angle = this._flipAngle || 0;
+    const cx = x + w/2, cy = y + h/2;
+    if (this._flipped) {
+      const barH = Math.round(h * 0.4);
+      ctx.fillStyle = '#c0392b'; ctx.fillRect(x, cy - barH/2, w, barH);
+      ctx.fillStyle = '#e74c3c';
+      const sz = 6, step = sz*2+2;
+      const count = Math.floor((w - sz) / step);
+      const ox = x + (w - count*step)/2 + sz;
+      for (let i = 0; i < count; i++) {
+        const sx2 = ox + i * step;
+        ctx.beginPath(); ctx.moveTo(sx2-sz, cy-barH/2); ctx.lineTo(sx2+sz, cy-barH/2); ctx.lineTo(sx2, cy-barH/2-sz*1.7); ctx.fill();
+        ctx.beginPath(); ctx.moveTo(sx2-sz, cy+barH/2); ctx.lineTo(sx2+sz, cy+barH/2); ctx.lineTo(sx2, cy+barH/2+sz*1.7); ctx.fill();
+      }
+      ctx.beginPath(); ctx.moveTo(x, cy-barH*0.4); ctx.lineTo(x, cy+barH*0.4); ctx.lineTo(x-sz*1.5, cy); ctx.fill();
+      ctx.beginPath(); ctx.moveTo(x+w, cy-barH*0.4); ctx.lineTo(x+w, cy+barH*0.4); ctx.lineTo(x+w+sz*1.5, cy); ctx.fill();
+    } else {
+      const scaleY = Math.cos(angle);
+      const dh = Math.max(3, Math.abs(scaleY) * h);
+      const dy = (h - dh) / 2;
+      ctx.fillStyle = this._flipWarning ? '#e74c3c' : '#8e44ad';
+      ctx.fillRect(x, y + dy, w, dh);
+      this._label(ctx, x, y + dy, w, dh, this._flipWarning ? 'FLIP!' : 'FLIP');
+    }
   }
 
   _dDisappearing(ctx, x, y, w, h) {
+    const sx = this._shakeX || 0;
     ctx.globalAlpha = this._triggered ? 0.4 : 1;
-    ctx.fillStyle = '#a29bfe'; ctx.fillRect(x, y, w, h);
-    this._label(ctx, x, y, w, h, 'VANISH');
+    ctx.fillStyle = '#a29bfe'; ctx.fillRect(x + sx, y, w, h);
+    this._label(ctx, x + sx, y, w, h, 'VANISH');
     ctx.globalAlpha = 1;
   }
 
@@ -513,25 +588,77 @@ class GO {
   }
 
   _dCannon(ctx, x, y, w, h) {
-    ctx.fillStyle='#2c3e50'; ctx.fillRect(x, y, w, h);
-    this._label(ctx, x, y, w, h, 'CANNON');
+    // Body
+    ctx.fillStyle = '#2c3e50';
+    ctx.fillRect(x+2, y+5, Math.round(w*0.62), h-10);
+    // Barrel extends right
+    ctx.fillStyle = '#1a252f';
+    ctx.fillRect(x + Math.round(w*0.48), y + Math.round(h*0.36), Math.round(w*0.52), Math.round(h*0.28));
+    // Wheels
+    ctx.fillStyle = '#34495e';
+    ctx.beginPath(); ctx.arc(x+7, y+h-6, 5, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(x+18, y+h-6, 5, 0, Math.PI*2); ctx.fill();
+    // Muzzle flash when just fired
+    if (this._firePhase != null && this._firePhase < 0.18) {
+      const ft = 1 - this._firePhase / 0.18;
+      const mx = x + w, my = y + h/2;
+      ctx.save();
+      ctx.globalAlpha = ft * 0.9;
+      const grd = ctx.createRadialGradient(mx, my, 0, mx, my, 13 * ft);
+      grd.addColorStop(0, '#ffffff');
+      grd.addColorStop(0.35, '#f39c12');
+      grd.addColorStop(1, 'rgba(243,156,18,0)');
+      ctx.fillStyle = grd;
+      ctx.beginPath(); ctx.arc(mx, my, 13 * ft, 0, Math.PI*2); ctx.fill();
+      ctx.restore();
+    }
   }
 
   _dBlackHole(ctx, x, y, w, h) {
-    ctx.fillStyle='#1a1a2e'; ctx.fillRect(x, y, w, h);
-    this._label(ctx, x, y, w, h, 'BH');
+    const bcx = x + w/2, bcy = y + h/2;
+    const r = Math.min(w, h) / 2 - 1;
+    const angle = this._spinAngle || 0;
+    // Outer glow
+    const grd = ctx.createRadialGradient(bcx, bcy, r*0.3, bcx, bcy, r);
+    grd.addColorStop(0, '#2d1b69');
+    grd.addColorStop(1, 'rgba(20,5,60,0.25)');
+    ctx.fillStyle = grd;
+    ctx.beginPath(); ctx.arc(bcx, bcy, r, 0, Math.PI*2); ctx.fill();
+    // 3 spinning spiral arms
+    ctx.save(); ctx.translate(bcx, bcy);
+    for (let i = 0; i < 3; i++) {
+      const a0 = angle + i * Math.PI * 2 / 3;
+      ctx.beginPath();
+      ctx.strokeStyle = i === 0 ? 'rgba(160,80,255,0.8)' : i === 1 ? 'rgba(100,60,220,0.7)' : 'rgba(200,100,255,0.65)';
+      ctx.lineWidth = 2;
+      for (let s = 0; s <= 1; s += 0.05) {
+        const sr = r * 0.14 + s * r * 0.82;
+        const sa = a0 - s * Math.PI * 1.9;
+        const px2 = Math.cos(sa)*sr, py2 = Math.sin(sa)*sr;
+        if (s === 0) ctx.moveTo(px2, py2); else ctx.lineTo(px2, py2);
+      }
+      ctx.stroke();
+    }
+    ctx.restore();
+    // Dark core
+    ctx.fillStyle = '#000008';
+    ctx.beginPath(); ctx.arc(bcx, bcy, r*0.3, 0, Math.PI*2); ctx.fill();
+    // Kill zone hint
+    ctx.fillStyle = 'rgba(255,20,20,0.3)';
+    ctx.beginPath(); ctx.arc(bcx, bcy, BH_KILL_RADIUS, 0, Math.PI*2); ctx.fill();
   }
 
-  _dZone(ctx, x, y, w, h, color, lnGrn, lnBlu) {
-    ctx.fillStyle=color+'28'; ctx.fillRect(x,y,w,h);
-    ctx.strokeStyle=color; ctx.lineWidth=2; ctx.setLineDash([6,3]);
-    ctx.strokeRect(x+1,y+1,w-2,h-2); ctx.setLineDash([]);
-    ctx.font='bold 9px monospace';
-    const flipped=ctx.getTransform().a<0;
-    const cx=flipped ? -(x+w/2) : x+w/2;
-    ctx.save(); if (flipped) ctx.scale(-1,1); ctx.textAlign='center';
-    ctx.fillStyle=TEAM.green.light; ctx.fillText(lnGrn, cx, y+h/2-3);
-    ctx.fillStyle=TEAM.blue.light;  ctx.fillText(lnBlu, cx, y+h/2+8);
+  _dZone(ctx, x, y, w, h, colorA, colorB) {
+    const sz = 20;
+    ctx.save();
+    ctx.globalAlpha = 0.5;
+    const cols = Math.ceil(w / sz), rows = Math.ceil(h / sz);
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        ctx.fillStyle = (r + c) % 2 === 0 ? colorA : colorB;
+        ctx.fillRect(x + c*sz, y + r*sz, Math.min(sz, w-c*sz), Math.min(sz, h-r*sz));
+      }
+    }
     ctx.restore();
   }
 
@@ -2157,6 +2284,9 @@ class Game {
         if (ridingNow && ridingNow.type==='disappearing' && !ridingNow._triggered) {
           ridingNow._triggered = true; ridingNow._triggerT = this._phaseTime;
           this.net.broadcast({ type:'platform_trigger', id:ridingNow.id, t:this._phaseTime });
+        }
+        if (ridingNow && ridingNow.type==='spring') {
+          ridingNow._compressTill = this._phaseTime + 0.2;
         }
 
         const diedByPhysics = evt && evt.startsWith('died') && lp.state==='alive';
