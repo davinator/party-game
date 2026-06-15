@@ -3,7 +3,7 @@
 // ─────────────────────────────────────────────
 //  WORLD CONSTANTS  (game-logic space)
 // ─────────────────────────────────────────────
-const WORLD_W = 3200, WORLD_H = 900;
+const WORLD_W = 3200; let WORLD_H = 900;
 const ZOOM = 1.5;
 const GRAVITY    = 0.55;
 const MAX_FALL   = 20;
@@ -13,11 +13,13 @@ const FRICTION   = 0.70;
 const AIR_FRIC   = 0.87;
 const JUMP_VEL   = -13.5;
 const SPRING_VEL = -21;
+const FINISH_POINTS = [10, 8, 7, 6, 5, 3]; // 1st → 6th+; earlier = more points
 const COYOTE     = 8;
 const JUMP_BUF   = 8;
+const THROW_BUF  = 5;
 const PW = 26, PH = 40;
 const SNAP = 16;
-const DEATH_Y = WORLD_H + 80;
+let DEATH_Y = WORLD_H + 80;
 
 const SCISSORS_GRACE    = 1.5;   // seconds of spawn immunity
 const SCISSORS_THROW_VX = 13;
@@ -41,6 +43,7 @@ const VERSION  = '0.1.36';
 const TEAM = {
   green: { primary: '#27ae60', light: '#2ecc71', name: 'Green Team' },
   blue:  { primary: '#2471a3', light: '#74b9ff', name: 'Blue Team'  },
+  red:   { primary: '#c0392b', light: '#e74c3c', name: 'The Target' },
 };
 
 const OBJ = {
@@ -108,46 +111,53 @@ const CLEAN_SLATE_LEVEL = [
 
 const UNFAVOURABLE_WINDS_LEVEL = [
   // Start zone (bottom left)
-  { id:'uw_start',  type:'platform',   x:32,   y:730, w:256, h:30, permanent:true },
-  { id:'uw_sz',     type:'start_zone', x:58,   y:700, w:190, h:30 },
+  { id:'uw_start', type:'platform',   x:32,   y:2030, w:256, h:30, permanent:true },
+  { id:'uw_sz',    type:'start_zone', x:58,   y:2000, w:190, h:30 },
   // End zone (bottom right)
-  { id:'uw_end',    type:'platform',   x:2880, y:730, w:256, h:30, permanent:true },
-  { id:'uw_ez',     type:'end_zone',   x:2910, y:700, w:190, h:30 },
-  // Central tower body
-  { id:'uw_tower',  type:'platform',   x:1490, y:130, w:220, h:650, permanent:true },
-  // Conveyors on tower top — left half push left, right half push right
-  { id:'uw_c1', type:'conveyor', x:1490, y:100, w:55, h:30, rotation:180, permanent:true },
-  { id:'uw_c2', type:'conveyor', x:1545, y:100, w:55, h:30, rotation:180, permanent:true },
-  { id:'uw_c3', type:'conveyor', x:1600, y:100, w:55, h:30, rotation:0,   permanent:true },
-  { id:'uw_c4', type:'conveyor', x:1655, y:100, w:55, h:30, rotation:0,   permanent:true },
-  // Left climbing platforms
-  { id:'uw_lp1', type:'platform', x:130,  y:630, w:128, h:30, permanent:true },
-  { id:'uw_lp2', type:'platform', x:330,  y:510, w:128, h:30, permanent:true },
-  { id:'uw_lp3', type:'platform', x:530,  y:400, w:128, h:30, permanent:true },
-  { id:'uw_lp4', type:'platform', x:300,  y:290, w:128, h:30, permanent:true },
-  { id:'uw_lp5', type:'platform', x:680,  y:310, w:128, h:30, permanent:true },
-  { id:'uw_lp6', type:'platform', x:880,  y:210, w:128, h:30, permanent:true },
-  { id:'uw_lp7', type:'platform', x:1100, y:160, w:128, h:30, permanent:true },
-  { id:'uw_lp8', type:'platform', x:1330, y:130, w:128, h:30, permanent:true },
-  // Left sawblades
-  { id:'uw_s1', type:'sawblade', x:240, y:575, w:44, h:44, permanent:true },
-  { id:'uw_s2', type:'sawblade', x:430, y:460, w:44, h:44, permanent:true },
-  { id:'uw_s3', type:'sawblade', x:750, y:365, w:44, h:44, permanent:true },
-  { id:'uw_s4', type:'sawblade', x:970, y:248, w:44, h:44, permanent:true },
-  // Right descending platforms
-  { id:'uw_rp1', type:'platform', x:1740, y:130, w:128, h:30, permanent:true },
-  { id:'uw_rp2', type:'platform', x:1930, y:200, w:128, h:30, permanent:true },
-  { id:'uw_rp3', type:'platform', x:2100, y:300, w:128, h:30, permanent:true },
-  { id:'uw_rp4', type:'platform', x:2300, y:390, w:128, h:30, permanent:true },
-  { id:'uw_rp5', type:'platform', x:2150, y:470, w:128, h:30, permanent:true },
-  { id:'uw_rp6', type:'platform', x:2380, y:540, w:128, h:30, permanent:true },
-  { id:'uw_rp7', type:'platform', x:2580, y:620, w:128, h:30, permanent:true },
-  { id:'uw_rp8', type:'platform', x:2740, y:690, w:128, h:30, permanent:true },
-  // Right sawblades
-  { id:'uw_s5', type:'sawblade', x:1980, y:158, w:44, h:44, permanent:true },
-  { id:'uw_s6', type:'sawblade', x:2220, y:350, w:44, h:44, permanent:true },
-  { id:'uw_s7', type:'sawblade', x:2440, y:500, w:44, h:44, permanent:true },
-  { id:'uw_s8', type:'sawblade', x:2645, y:578, w:44, h:44, permanent:true },
+  { id:'uw_end',   type:'platform',   x:1550, y:2030, w:256, h:30, permanent:true },
+  { id:'uw_ez',    type:'end_zone',   x:1580, y:2000, w:190, h:30 },
+
+  // Central tower — 440×1600, top at y:400, bottom at y:2000
+  { id:'uw_tower', type:'platform', x:660, y:400, w:440, h:1600, permanent:true },
+
+  // Conveyors on tower top — left pair push left, right pair push right
+  { id:'uw_c1', type:'conveyor', x:660,  y:370, w:110, h:30, rotation:180, permanent:true },
+  { id:'uw_c2', type:'conveyor', x:770,  y:370, w:110, h:30, rotation:180, permanent:true },
+  { id:'uw_c3', type:'conveyor', x:880,  y:370, w:110, h:30, rotation:0,   permanent:true },
+  { id:'uw_c4', type:'conveyor', x:990,  y:370, w:110, h:30, rotation:0,   permanent:true },
+
+  // Left climbing moving platforms — zigzag, slide horizontally (±rangeX)
+  { id:'uw_lp1', type:'moving_platform', x:60,  y:1850, w:180, h:30, permanent:true, rangeX:60, rangeY:0, speed:1.0 },
+  { id:'uw_lp2', type:'moving_platform', x:360, y:1660, w:180, h:30, permanent:true, rangeX:60, rangeY:0, speed:1.3 },
+  { id:'uw_lp3', type:'moving_platform', x:60,  y:1470, w:180, h:30, permanent:true, rangeX:60, rangeY:0, speed:0.8 },
+  { id:'uw_lp4', type:'moving_platform', x:360, y:1280, w:180, h:30, permanent:true, rangeX:60, rangeY:0, speed:1.5 },
+  { id:'uw_lp5', type:'moving_platform', x:60,  y:1090, w:180, h:30, permanent:true, rangeX:60, rangeY:0, speed:1.1 },
+  { id:'uw_lp6', type:'moving_platform', x:360, y:880,  w:180, h:30, permanent:true, rangeX:60, rangeY:0, speed:0.9 },
+  { id:'uw_lp7', type:'moving_platform', x:60,  y:670,  w:180, h:30, permanent:true, rangeX:60, rangeY:0, speed:1.4 },
+  { id:'uw_lp8', type:'moving_platform', x:390, y:430,  w:220, h:30, permanent:true, rangeX:60, rangeY:0, speed:1.2 },
+
+  // Left sawblades — static hazards
+  { id:'uw_s1', type:'sawblade', x:200, y:1745, w:88, h:88, permanent:true },
+  { id:'uw_s2', type:'sawblade', x:200, y:1360, w:88, h:88, permanent:true },
+  { id:'uw_s3', type:'sawblade', x:200, y:970,  w:88, h:88, permanent:true },
+  { id:'uw_s4', type:'sawblade', x:200, y:560,  w:88, h:88, permanent:true },
+
+  // Right descending moving platforms — zigzag, bob vertically (±rangeY)
+  { id:'uw_rp1', type:'moving_platform', x:1130, y:430,  w:180, h:30, permanent:true, rangeX:80, rangeY:0, speed:1.2 },
+  { id:'uw_rp2', type:'moving_platform', x:1400, y:610,  w:180, h:30, permanent:true, rangeX:80, rangeY:0, speed:0.9 },
+  { id:'uw_rp3', type:'moving_platform', x:1130, y:790,  w:180, h:30, permanent:true, rangeX:80, rangeY:0, speed:1.4 },
+  { id:'uw_rp4', type:'moving_platform', x:1400, y:970,  w:180, h:30, permanent:true, rangeX:80, rangeY:0, speed:1.0 },
+  { id:'uw_rp5', type:'moving_platform', x:1130, y:1150, w:180, h:30, permanent:true, rangeX:80, rangeY:0, speed:0.8 },
+  { id:'uw_rp6', type:'moving_platform', x:1400, y:1330, w:180, h:30, permanent:true, rangeX:80, rangeY:0, speed:1.3 },
+  { id:'uw_rp7', type:'moving_platform', x:1130, y:1510, w:180, h:30, permanent:true, rangeX:80, rangeY:0, speed:1.1 },
+  { id:'uw_rp8', type:'moving_platform', x:1400, y:1690, w:180, h:30, permanent:true, rangeX:80, rangeY:0, speed:0.9 },
+  { id:'uw_rp9', type:'moving_platform', x:1130, y:1880, w:180, h:30, permanent:true, rangeX:80, rangeY:0, speed:1.2 },
+
+  // Right sawblades — static hazards
+  { id:'uw_s5', type:'sawblade', x:1310, y:520,  w:88, h:88, permanent:true },
+  { id:'uw_s6', type:'sawblade', x:1310, y:880,  w:88, h:88, permanent:true },
+  { id:'uw_s7', type:'sawblade', x:1310, y:1240, w:88, h:88, permanent:true },
+  { id:'uw_s8', type:'sawblade', x:1310, y:1600, w:88, h:88, permanent:true },
 ];
 
 const JSON_LEVEL = [
@@ -178,18 +188,21 @@ const JSON_LEVEL = [
   { id:'jl_cv1', type:'conveyor', x:950,  y:620, w:130, h:20, rotation:0,   permanent:true },
   { id:'jl_cv2', type:'conveyor', x:1160, y:500, w:130, h:20, rotation:0,   permanent:true },
   { id:'jl_cv3', type:'conveyor', x:1370, y:380, w:130, h:20, rotation:0,   permanent:true },
-  { id:'jl_cv4', type:'conveyor', x:1540, y:260, w:130, h:20, rotation:0,   permanent:true },
+  { id:'jl_cv4', type:'platform', x:1540, y:260, w:130, h:20, permanent:true },
   // Descend right-to-left (push left = headwind — fight to advance)
   { id:'jl_cv5', type:'conveyor', x:1720, y:380, w:130, h:20, rotation:180, permanent:true },
   { id:'jl_cv6', type:'conveyor', x:1910, y:500, w:130, h:20, rotation:180, permanent:true },
   { id:'jl_cv7', type:'conveyor', x:2100, y:620, w:130, h:20, rotation:180, permanent:true },
 
   // Sawblades in the gap between each conveyor pair
-  { id:'jl_s1', type:'sawblade', x:1075, y:455, w:44, h:44, permanent:true },
-  { id:'jl_s2', type:'sawblade', x:1455, y:335, w:44, h:44, permanent:true },
-  { id:'jl_s3', type:'sawblade', x:1640, y:315, w:44, h:44, permanent:true },
-  { id:'jl_s4', type:'sawblade', x:1825, y:455, w:44, h:44, permanent:true },
-  { id:'jl_s5', type:'sawblade', x:2010, y:560, w:44, h:44, permanent:true },
+  { id:'jl_s1', type:'sawblade', x:1075, y:455, w:88, h:88, permanent:true },
+  { id:'jl_s2', type:'sawblade', x:1455, y:335, w:88, h:88, permanent:true },
+  { id:'jl_s3', type:'sawblade', x:1640, y:315, w:88, h:88, permanent:true },
+  { id:'jl_s4', type:'sawblade', x:1825, y:455, w:88, h:88, permanent:true },
+  { id:'jl_s5', type:'sawblade', x:2010, y:560, w:88, h:88, permanent:true },
+
+  // Target spawn — above the ascending conveyor peak (cv4 at x:1540,y:260)
+  { id:'jl_tz', type:'target_zone', x:1552, y:228, w:76, h:20, permanent:true },
 
   // Bridge from cv7 to } brace
   { id:'jl_br1', type:'platform', x:2240, y:490, w:60, h:20, permanent:true },
@@ -214,8 +227,8 @@ const JSON_LEVEL = [
 const LEVELS = {
   default:             { name:'Default',             objects: BASE_LEVEL },
   clean_slate:         { name:'Clean Slate',         objects: CLEAN_SLATE_LEVEL },
-  unfavourable_winds:  { name:'Unfavourable Winds',  objects: UNFAVOURABLE_WINDS_LEVEL },
-  json:                { name:'JSON',                objects: JSON_LEVEL },
+  unfavourable_winds:  { name:'Unfavourable Winds',  objects: UNFAVOURABLE_WINDS_LEVEL, worldH: 2100 },
+  json:                { name:'JSON',                objects: JSON_LEVEL, scissors: true, target: true },
   scissors:            { name:'Running with Scissors', objects: BASE_LEVEL, scissors:true },
 };
 
@@ -984,6 +997,12 @@ class Level {
     if (!ez) return { x: WORLD_W - 160, y: 560 };
     return { x: ez.x + ez.w/2 - PW/2, y: ez.y - PH - 4 };
   }
+
+  targetPos() {
+    const tz = this.objects.find(o=>o.type==='target_zone');
+    if (!tz) return { x: WORLD_W/2 - PW/2, y: 560 };
+    return { x: tz.x + tz.w/2 - PW/2, y: tz.y - PH - 4 };
+  }
 }
 
 // ─────────────────────────────────────────────
@@ -996,7 +1015,7 @@ class Player {
     this.x=0; this.y=0; this.vx=0; this.vy=0;
     this.onGround=false; this.facing=1;
     this.state='alive'; // alive | dead | finished
-    this._coyote=0; this._jbuf=0; this.walk=0;
+    this._coyote=0; this._jbuf=0; this._throwBuf=0; this.walk=0;
     this.ghostMode=false;
     this.placementsLeft=0;
     this._riding=null;
@@ -1008,7 +1027,9 @@ class Player {
     this._danceT=0;   // > 0 while holding Z or finished
     this.charType='c1';
     this._justJumped=false;
-    this.hasScissors    = false;
+    this.scissorsCount  = 0;
+    this.isTarget       = false;
+    this._originalTeam  = team;
     this._scissorsGrace = 0;
     // Dead reckoning for remote players
     this._remX=0; this._remY=0; this._remVX=0; this._remVY=0; this._remAge=0;
@@ -1017,7 +1038,7 @@ class Player {
   spawn(x,y) {
     this.x=x; this.y=y; this.vx=0; this.vy=0;
     this.onGround=false; this.state='alive';
-    this._coyote=0; this._jbuf=0; this.ghostMode=false;
+    this._coyote=0; this._jbuf=0; this._throwBuf=0; this.ghostMode=false;
   }
 
   updateLocal(inp, level, placementActive=false, mirrorControls=true) {
@@ -1182,7 +1203,8 @@ class Player {
     this.walk=d.walk; this.ghostMode=d.ghostMode;
     if (d.danceT !== undefined) this._danceT = d.danceT;
     if (d.charType) this.charType = d.charType;
-    if (d.hasScissors !== undefined) this.hasScissors = d.hasScissors;
+    if (d.scissorsCount !== undefined) this.scissorsCount = d.scissorsCount;
+    if (d.isTarget !== undefined) this.isTarget = d.isTarget;
   }
 
   updateRemote(solids=[]) {
@@ -1212,7 +1234,7 @@ class Player {
              facing:this.facing, onGround:this.onGround,
              state:this.state, walk:this.walk, ghostMode:this.ghostMode,
              danceT:this._danceT, charType:this.charType,
-         hasScissors:this.hasScissors };
+         scissorsCount:this.scissorsCount, isTarget:this.isTarget };
   }
 
   draw(ctx, isLocal, asGhost=false) {
@@ -1242,7 +1264,7 @@ class Player {
     }
 
     // Held scissors (drawn while alive, before alpha reset so ghosts dim them too)
-    if (this.hasScissors && !inDeathSeq && !this.ghostMode) {
+    if (this.scissorsCount > 0 && !inDeathSeq && !this.ghostMode) {
       const _sImg = sprites._imgs['scissors'];
       if (_sImg && _sImg.complete && _sImg.naturalWidth) {
         const sw = 20, sh = 20;
@@ -1746,24 +1768,37 @@ class Renderer {
   constructor(canvas) { this.canvas=canvas; this.ctx=canvas.getContext('2d'); }
 
   // Background fills the canvas (screen space, called before camera transform)
-  clear(vw, vh, camX) {
+  clear(vw, vh, camX, levelId) {
     const c=this.ctx;
-    const bgImg = sprites._imgs['background'];
-    if (bgImg) {
-      // Tile background horizontally with slow parallax
-      const bw = bgImg.width, bh = bgImg.height;
-      const scale = vh / bh;
-      const dw = bw * scale; // drawn width per tile
-      const offset = (camX * 0.15) % dw;
-      const startX = -(offset + dw) % dw;
-      for (let tx = startX; tx < vw; tx += dw) {
-        c.drawImage(bgImg, 0, 0, bw, bh, tx, 0, dw, vh);
+    const bgImg = sprites._imgs['bg_' + (levelId || 'default')];
+    if (bgImg && bgImg.complete && bgImg.naturalWidth > 0) {
+      const bw = bgImg.naturalWidth, bh = bgImg.naturalHeight;
+      if (levelId === 'json') {
+        c.fillStyle = '#0e0e14';
+        c.fillRect(0, 0, vw, vh);
+        c.save();
+        c.globalAlpha = 0.2;
+        const offset = (camX * 0.1) % bw;
+        const startX = -(offset + bw) % bw;
+        for (let ty = 0; ty < vh; ty += bh) {
+          for (let tx = startX; tx < vw; tx += bw) {
+            c.drawImage(bgImg, tx, ty, bw, bh);
+          }
+        }
+        c.restore();
+      } else {
+        const scale = vh / bh;
+        const dw = bw * scale;
+        const offset = (camX * 0.15) % dw;
+        const startX = -(offset + dw) % dw;
+        for (let tx = startX; tx < vw; tx += dw) {
+          c.drawImage(bgImg, 0, 0, bw, bh, tx, 0, dw, vh);
+        }
       }
     } else {
       const g=c.createLinearGradient(0,0,0,vh);
       g.addColorStop(0,'#5DADE2'); g.addColorStop(0.6,'#A9D4F5'); g.addColorStop(1,'#D5EAF8');
       c.fillStyle=g; c.fillRect(0,0,vw,vh);
-      // Parallax clouds
       const cx = camX * 0.12;
       c.fillStyle='rgba(255,255,255,0.88)';
       for (let i=0;i<14;i++) {
@@ -1777,7 +1812,6 @@ class Renderer {
         c.fill();
       }
     }
-    // Death-zone warm glow
     const dg=c.createLinearGradient(0,vh-70,0,vh);
     dg.addColorStop(0,'rgba(210,60,0,0)'); dg.addColorStop(1,'rgba(210,60,0,0.28)');
     c.fillStyle=dg; c.fillRect(0,vh-70,vw,70);
@@ -1905,6 +1939,7 @@ class Game {
     this.round       = 1;
     this.totalRounds = DEFAULT_ROUNDS;
     this._deathOrder  = [];
+    this._finishOrder = [];
     this._mouseActive = false;
     this._lastCamMx   = 0;
     this._lastCamMy   = 0;
@@ -1922,6 +1957,13 @@ class Game {
     this._projCounter = 0;
 
     sprites.load(SPRITE_MANIFEST);
+
+    ['default','clean_slate','unfavourable_winds','scissors'].forEach(id => {
+      const img = new Image();
+      img.onload = () => { sprites._imgs['bg_' + id] = img; };
+      img.src = `sprites/bg_${id}.svg`;
+    });
+    { const img = new Image(); img.onload = () => { sprites._imgs['bg_json'] = img; }; img.src = 'sprites/json.png'; }
 
     this._resize();
     window.addEventListener('resize', ()=>this._resize());
@@ -2002,7 +2044,7 @@ class Game {
       .addEventListener('click', ()=>{
         if (!this.isHost || this.phase!=='play') return;
         this._applyPhase('results', RESULTS_TIME);
-        this.net.broadcast({ type:'phase_change', newPhase:'results', timer:RESULTS_TIME });
+        this.net.broadcast({ type:'phase_change', newPhase:'results', timer:RESULTS_TIME, scores:this.scores });
       });
 
     this.canvas.addEventListener('mousemove', e=>{
@@ -2077,6 +2119,11 @@ class Game {
     timerEl.className = (secs<=10 && this.phase!=='results' && this.phase!=='play') ? 'urgent' : '';
     document.getElementById('score-green').textContent=this.scores.green;
     document.getElementById('score-blue').textContent=this.scores.blue;
+    const twEl = document.getElementById('score-target-wrap');
+    if (twEl) {
+      twEl.style.display = this._targetMode ? '' : 'none';
+      if (this._targetMode) document.getElementById('score-target').textContent = this.scores.target || 0;
+    }
   }
 
   _updatePlayerDots() {
@@ -2100,12 +2147,39 @@ class Game {
       const isGameOver = this.phase==='gameover';
       document.getElementById('results-title').textContent =
         isGameOver ? 'GAME OVER' : `ROUND ${this.round} / ${this.totalRounds}`;
-      document.getElementById('results-scores').innerHTML=
-        `<span class="res-green">Green: ${this.scores.green}</span>&emsp;<span class="res-blue">Blue: ${this.scores.blue}</span>`;
-      const fin=Object.values(this.players).filter(p=>p.state==='finished');
-      document.getElementById('results-finished').textContent=
-        isGameOver ? (this.scores.green>this.scores.blue?'Green wins!':this.scores.blue>this.scores.green?'Blue wins!':'It\'s a tie!')
-                   : (fin.length ? 'Finished: '+fin.map(p=>p.name).join(', ') : 'Nobody finished!');
+      if (this._targetMode) {
+        document.getElementById('results-scores').innerHTML=
+          `<span class="res-green">Green: ${this.scores.green}</span>&emsp;` +
+          `<span class="res-red">🎯 Target: ${this.scores.target||0}</span>&emsp;` +
+          `<span class="res-blue">Blue: ${this.scores.blue}</span>`;
+        if (isGameOver) {
+          const maxS = Math.max(this.scores.green, this.scores.target||0, this.scores.blue);
+          document.getElementById('results-finished').textContent =
+            (this.scores.target||0)===maxS && this.scores.target>this.scores.green && this.scores.target>this.scores.blue
+              ? 'The Target wins!'
+              : this.scores.green===maxS && this.scores.green>this.scores.blue ? 'Green wins!'
+              : this.scores.blue===maxS && this.scores.blue>this.scores.green  ? 'Blue wins!'
+              : 'It\'s a tie!';
+        } else {
+          document.getElementById('results-finished').textContent = '';
+        }
+      } else {
+        document.getElementById('results-scores').innerHTML=
+          `<span class="res-green">Green: ${this.scores.green}</span>&emsp;<span class="res-blue">Blue: ${this.scores.blue}</span>`;
+        const fin=Object.values(this.players).filter(p=>p.state==='finished');
+        document.getElementById('results-finished').textContent=
+          isGameOver ? (this.scores.green>this.scores.blue?'Green wins!':this.scores.blue>this.scores.green?'Blue wins!':'It\'s a tie!')
+                     : (fin.length ? 'Finished: '+fin.map(p=>p.name).join(', ') : 'Nobody finished!');
+      }
+      const scoreAssignEl = document.getElementById('score-assign-panel');
+      if (scoreAssignEl) {
+        scoreAssignEl.style.display = (this._targetMode && !isGameOver && this.isHost) ? '' : 'none';
+        if (this._targetMode && !isGameOver && this.isHost) {
+          document.getElementById('assign-green-btn').onclick = () => this._assignScore('green');
+          document.getElementById('assign-target-btn').onclick = () => this._assignScore('target');
+          document.getElementById('assign-blue-btn').onclick = () => this._assignScore('blue');
+        }
+      }
       const btn=document.getElementById('next-round-btn');
       const waiting=document.getElementById('results-waiting');
       btn.textContent = isGameOver ? '↩ Go back to waiting room' : '▶ Next Round';
@@ -2283,7 +2357,15 @@ class Game {
     net.on('state_sync', msg=>{
       if (msg.to!==this.localId) return;
       this.scores=msg.scores; this.round=msg.round; this.totalRounds=msg.totalRounds||DEFAULT_ROUNDS;
-      if (msg.levelId) this._levelId = msg.levelId;
+      if (msg.levelId) { this._levelId = msg.levelId; WORLD_H = LEVELS[msg.levelId]?.worldH || 900; DEATH_Y = WORLD_H + 80; }
+      this._targetMode = !!LEVELS[this._levelId]?.target;
+      if (msg.targetPlayerId !== undefined) {
+        this._targetPlayerId = msg.targetPlayerId;
+        if (this._targetPlayerId) {
+          const _tp = this.players[this._targetPlayerId];
+          if (_tp) { _tp._originalTeam = _tp._originalTeam || _tp.team; _tp.team = 'red'; _tp.isTarget = true; }
+        }
+      }
       msg.players.forEach(p=>{
         if (p.id!==this.localId) this._addPlayer(p.id,p.name,p.team,p.colorIdx);
         const pl=this.players[p.id];
@@ -2314,6 +2396,7 @@ class Game {
         objects:this.level.serialize(), phase:this.phase, timer:this.timer,
         scores:this.scores, round:this.round, totalRounds:this.totalRounds, players:pArr,
         levelId: this._levelId || 'default',
+        targetPlayerId: this._targetPlayerId || null,
       });
     });
 
@@ -2322,8 +2405,13 @@ class Game {
       if (msg.round       !== undefined) this.round       = msg.round;
       if (msg.totalRounds !== undefined) this.totalRounds = msg.totalRounds;
       if (msg.scores      !== undefined) this.scores      = msg.scores;
-      if (msg.levelId     !== undefined) this._levelId    = msg.levelId;
+      if (msg.levelId     !== undefined) { this._levelId = msg.levelId; this._targetMode = !!LEVELS[this._levelId]?.target; }
+      if (msg.targetPlayerId !== undefined) this._targetPlayerId = msg.targetPlayerId;
       this._applyPhase(msg.newPhase, msg.timer);
+    });
+
+    net.on('score_assign', msg=>{
+      if (msg.scores) this.scores = msg.scores;
     });
 
     net.on('player_update', msg=>{
@@ -2355,10 +2443,10 @@ class Game {
           p._deathProjFloorY = this.level.floorBelow(projLandX, p._deathY);
         } else { p._deathProjFloorY = null; }
         p.state='dead'; p.ghostMode=true; p._deathT=0;
-        p.hasScissors = false;
+        p.scissorsCount = 0;
         if (this.phase==='play') this._deathOrder.push(msg.playerId);
       }
-      if (msg.event==='finished') { p.state='finished'; p.ghostMode=false; }
+      if (msg.event==='finished') { p.state='finished'; p.ghostMode=false; this._finishOrder.push(msg.playerId); }
     });
 
     net.on('scissors_throw', msg=>{
@@ -2441,6 +2529,36 @@ class Game {
     if (msg) msg.textContent = `Room: ${this.roomId||'?'}  ·  ${cnt} player${cnt!==1?'s':''}`;
     const cfg = document.getElementById('host-config');
     if (cfg) cfg.style.display = this.isHost ? '' : 'none';
+
+    // Register level-select onChange once to refresh target visibility
+    const lvlEl = document.getElementById('level-select');
+    if (lvlEl && !lvlEl._targetListenerAdded) {
+      lvlEl._targetListenerAdded = true;
+      lvlEl.addEventListener('change', () => this._refreshWaitingPanel());
+    }
+
+    // Target player selector
+    const isTargetLevel = lvlEl && !!LEVELS[lvlEl.value]?.target;
+    const targetCfg = document.getElementById('target-config');
+    if (targetCfg) targetCfg.style.display = (this.isHost && isTargetLevel) ? '' : 'none';
+    if (this.isHost && isTargetLevel) {
+      const tsel = document.getElementById('target-select');
+      if (tsel) {
+        const playerKey = Object.values(this.players).map(p => p.id + p.team).join(',');
+        if (tsel._lastPlayerKey !== playerKey) {
+          tsel._lastPlayerKey = playerKey;
+          const prev = tsel.value;
+          tsel.innerHTML = '<option value="">— pick a player —</option>';
+          Object.values(this.players).forEach(p => {
+            const opt = document.createElement('option');
+            opt.value = p.id;
+            opt.textContent = `${p.name} (${p.team === 'blue' ? '🔵' : '🟢'})`;
+            if (p.id === prev) opt.selected = true;
+            tsel.appendChild(opt);
+          });
+        }
+      }
+    }
   }
 
   // ── PHASES ──
@@ -2450,21 +2568,41 @@ class Game {
     const lvlEl = document.getElementById('level-select');
     this._levelId = (lvlEl && LEVELS[lvlEl.value]) ? lvlEl.value : 'default';
     this.round = 1;
-    this.scores = { green:0, blue:0 };
+    this._targetMode = !!LEVELS[this._levelId]?.target;
+    this._targetPlayerId = null;
+    if (this._targetMode) {
+      const tsel = document.getElementById('target-select');
+      if (tsel && tsel.value) this._targetPlayerId = tsel.value;
+    }
+    this.scores = { green:0, blue:0, target:0 };
     this._deathOrder = [];
     this._applyPhase('build', BUILD_TIME);
     this.net.broadcast({ type:'phase_change', newPhase:'build', timer:BUILD_TIME,
-      round:1, totalRounds:this.totalRounds, scores:this.scores, levelId:this._levelId });
+      round:1, totalRounds:this.totalRounds, scores:this.scores, levelId:this._levelId,
+      targetPlayerId: this._targetPlayerId });
   }
 
   _applyPhase(phase, timer) {
     this.phase=phase; this.timer=timer; this._phaseTime=0;
 
-    if (phase==='waiting') { music.playMenu(); this._enterWaiting(); return; }
+    if (phase==='waiting') {
+      WORLD_H = 900; DEATH_Y = 980;
+      this._targetMode = false;
+      Object.values(this.players).forEach(p => {
+        if (p.isTarget) { p.team = p._originalTeam || 'green'; p.isTarget = false; }
+      });
+      this._targetPlayerId = null;
+      music.playMenu(); this._enterWaiting(); return;
+    }
 
     if (phase==='build') {
+      WORLD_H = LEVELS[this._levelId]?.worldH || 900; DEATH_Y = WORLD_H + 80;
       this._scissorsProjectiles = [];
       if (this.round===1) { this.level.reset(this._levelId || 'default'); music.playLevel(); }
+      if (this._targetPlayerId) {
+        const _tp = this.players[this._targetPlayerId];
+        if (_tp) { _tp._originalTeam = _tp._originalTeam || _tp.team; _tp.team = 'red'; _tp.isTarget = true; }
+      }
       this._enterGame();
       this._spawnPlayers();
       const n = Object.keys(this.players).length;
@@ -2487,10 +2625,15 @@ class Game {
       this.placement.close();
     }
     if (phase==='play') {
+      this._finishOrder = [];
       const _isScissors = !!LEVELS[this._levelId]?.scissors;
       Object.values(this.players).forEach(p=>{
         p.state='alive'; p.ghostMode=false;
-        if (_isScissors) { p.hasScissors=true; p._scissorsGrace=SCISSORS_GRACE; }
+        if (_isScissors) {
+          const _n = Object.keys(this.players).length;
+          p.scissorsCount = p.isTarget ? Math.max(1, Math.floor(_n / 2)) : 1;
+          p._scissorsGrace = SCISSORS_GRACE;
+        }
       });
     }
     if (phase==='results') {
@@ -2539,17 +2682,18 @@ class Game {
   _spawnPlayers() {
     const sp=this.level.startPos();
     const ep=this.level.endPos();
-    // Sort by ID so every client assigns the same spawn slot to the same player
+    const tp=this.level.targetPos();
     const pArr=Object.values(this.players).sort((a,b)=>a.id<b.id?-1:1);
     let ri=0, bi=0;
     pArr.forEach(p => {
-      if (p.team==='blue') { p.spawn(ep.x - bi*(PW+20), ep.y); bi++; }
-      else                 { p.spawn(sp.x + ri*(PW+20), sp.y); ri++; }
+      if (p.isTarget)           { p.spawn(tp.x, tp.y); }
+      else if (p.team==='blue') { p.spawn(ep.x - bi*(PW+20), ep.y); bi++; }
+      else                      { p.spawn(sp.x + ri*(PW+20), sp.y); ri++; }
     });
     const lp=this.localPlayer;
     if (lp) {
       const _VW = this.vw/ZOOM, _VH = this.vh/ZOOM;
-      const tx = lp.team==='blue'
+      const tx = (lp.team==='blue' && !lp.isTarget)
         ? clamp(WORLD_W-(lp.x+PW/2)-_VW/2, 0, Math.max(0,WORLD_W-_VW))
         : clamp(lp.x+PW/2-_VW/2, 0, Math.max(0,WORLD_W-_VW));
       this.cam.x = tx;
@@ -2558,8 +2702,19 @@ class Game {
   }
 
   _tallyScores() {
-    Object.values(this.players).filter(p=>p.state==='finished')
-      .forEach(p=>{ this.scores[p.team]=(this.scores[p.team]||0)+10; });
+    if (!this.isHost || this._targetMode) return;
+    this._finishOrder.forEach((id, i) => {
+      const p = this.players[id];
+      if (!p) return;
+      const pts = FINISH_POINTS[Math.min(i, FINISH_POINTS.length - 1)];
+      this.scores[p.team] = (this.scores[p.team] || 0) + pts;
+    });
+  }
+
+  _assignScore(team) {
+    if (!this.isHost) return;
+    this.scores[team] = (this.scores[team] || 0) + 1;
+    this.net.broadcast({ type:'score_assign', scores: { ...this.scores } });
   }
 
   // ── LOOP ──
@@ -2667,8 +2822,9 @@ class Game {
         }
 
         // Scissors throw (F key)
-        if (_scissorsLevel && lp.hasScissors && lp.state==='alive' && this.input.throwPressed) {
-          lp.hasScissors = false;
+        if (_scissorsLevel && lp.scissorsCount > 0 && lp.state==='alive' && lp._throwBuf > 0) {
+          lp._throwBuf = 0;
+          lp.scissorsCount--;
           this._projCounter++;
           const _tp = {
             id:`${this.localId}_${this._projCounter}`,
@@ -2679,13 +2835,15 @@ class Game {
           };
           this._scissorsProjectiles.push(_tp);
           this.net.broadcast({ type:'scissors_throw', ..._tp });
+        } else if (lp._throwBuf > 0) {
+          lp._throwBuf--;
         }
 
         // Contact kill: check before collision resolution pushes players apart
         let _contactScissorsKill = false;
         if (_scissorsLevel && lp.state==='alive' && lp._scissorsGrace<=0) {
           for (const op of Object.values(this.players)) {
-            if (op.id===this.localId||op.state!=='alive'||!op.hasScissors||op._scissorsGrace>0) continue;
+            if (op.id===this.localId||op.state!=='alive'||op.scissorsCount===0||op._scissorsGrace>0) continue;
             if (overlap(lp.x,lp.y,PW,PH, op.x,op.y,PW,PH)) { _contactScissorsKill=true; break; }
           }
         }
@@ -2742,7 +2900,7 @@ class Game {
               lp._deathProjFloorY = this.level.floorBelow(projLandX, lp._deathY);
             } else { lp._deathProjFloorY = null; }
             lp.state='dead'; lp.ghostMode=true; lp._deathT=0;
-            lp.hasScissors = false;
+            lp.scissorsCount = 0;
             sfx.playDeath(lp.charType, deathCause);
             this.net.broadcast({ type:'player_event', playerId:this.localId, event:'died', cause:deathCause });
             this._deathOrder.push(this.localId);
@@ -2753,6 +2911,7 @@ class Game {
 
         if (evt==='finished' && lp.state==='alive' && this.phase==='play') {
           lp.state='finished';
+          this._finishOrder.push(this.localId);
           this.net.broadcast({ type:'player_event', playerId:this.localId, event:'finished' });
         }
 
@@ -2763,10 +2922,18 @@ class Game {
         }
 
         if (this.isHost && this.phase==='play') {
-          const active = Object.values(this.players).filter(p=>p.state==='alive');
-          if (active.length===0) {
+          let roundOver = false;
+          if (this._targetMode && this._targetPlayerId) {
+            const tgt = this.players[this._targetPlayerId];
+            const targetAlive = tgt && tgt.state === 'alive';
+            const huntersAlive = Object.values(this.players).some(p => !p.isTarget && p.state === 'alive');
+            roundOver = !targetAlive || !huntersAlive;
+          } else {
+            roundOver = Object.values(this.players).every(p => p.state !== 'alive');
+          }
+          if (roundOver) {
             this._applyPhase('results', RESULTS_TIME);
-            this.net.broadcast({ type:'phase_change', newPhase:'results', timer:RESULTS_TIME });
+            this.net.broadcast({ type:'phase_change', newPhase:'results', timer:RESULTS_TIME, scores:this.scores });
           }
         }
       }
@@ -2855,6 +3022,9 @@ class Game {
     if (inp.jumpPressed && lp.state !== 'finished') {
       lp._jbuf=JUMP_BUF;
     }
+    if (inp.throwPressed) {
+      lp._throwBuf=THROW_BUF;
+    }
 
     if (inp.pressed('KeyR')) {
       if (this._canPlace()) {
@@ -2872,13 +3042,13 @@ class Game {
     const ctx = r.ctx;
 
     // ── Screen-space background ──
-    r.clear(vw, vh, cam.x);
+    r.clear(vw, vh, cam.x, this._levelId);
 
     // ── World-space objects ──
     ctx.save();
     const localTeam = this.localPlayer?.team;
     ctx.scale(ZOOM, ZOOM);
-    if (localTeam === 'blue' && this.phase !== 'waiting') {
+    if (localTeam === 'blue' && !this.localPlayer?.isTarget && this.phase !== 'waiting') {
       ctx.translate(WORLD_W - cam.x, -cam.y);
       ctx.scale(-1, 1);
     } else {

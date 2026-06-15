@@ -183,7 +183,9 @@
       display: inline-block;
     }
     .dot-green { background: #27ae60; }
-    .dot-blue { background: #3498db; }
+    .dot-blue  { background: #3498db; }
+    .dot-red   { background: #e74c3c; }
+    .res-red   { color: #e74c3c; }
 
     .host-badge {
       font-size: 0.65rem;
@@ -344,6 +346,13 @@
           <option value="scissors">Running with Scissors</option>
         </select>
       </div>
+      <div id="target-config" style="display:none;">
+        <label style="font-size:0.72rem;color:#aaa;text-align:left;display:block;margin-bottom:4px;margin-top:10px;">🎯 The Target</label>
+        <select id="target-select"
+          style="width:100%;padding:7px 10px;background:rgba(255,255,255,0.08);border:1px solid #c0392b;border-radius:4px;color:#e74c3c;font-family:inherit;font-size:0.9rem;outline:none;cursor:pointer;">
+          <option value="">— pick a player —</option>
+        </select>
+      </div>
       <button class="primary-btn green-btn" id="start-btn">▶ START GAME (host only)</button>
     </div>
 
@@ -364,6 +373,7 @@
   <div id="hud-center">
     <span id="hud-phase-label">BUILD</span>
     <span id="hud-timer">30s</span>
+    <span id="score-target-wrap" style="display:none;font-size:0.7rem;color:#e74c3c;margin-top:3px;">🎯 Target: <span id="score-target">0</span></span>
   </div>
   <div class="hud-team hud-team-blue"><span class="hud-score" id="score-blue">0</span> Blue 🔵</div>
 </div>
@@ -389,6 +399,14 @@
   <div id="results-title">ROUND OVER</div>
   <div id="results-scores"></div>
   <div id="results-finished"></div>
+  <div id="score-assign-panel" style="display:none;margin-bottom:14px;">
+    <p style="font-size:0.78rem;color:#aaa;margin-bottom:8px;">Assign this round's point to:</p>
+    <div style="display:flex;gap:8px;justify-content:center;">
+      <button id="assign-green-btn" style="padding:7px 14px;background:#27ae60;color:#fff;border:none;border-radius:4px;font-family:inherit;cursor:pointer;font-size:0.85rem;">🟢 Green</button>
+      <button id="assign-target-btn" style="padding:7px 14px;background:#c0392b;color:#fff;border:none;border-radius:4px;font-family:inherit;cursor:pointer;font-size:0.85rem;">🎯 Target</button>
+      <button id="assign-blue-btn" style="padding:7px 14px;background:#2471a3;color:#fff;border:none;border-radius:4px;font-family:inherit;cursor:pointer;font-size:0.85rem;">🔵 Blue</button>
+    </div>
+  </div>
   <button id="next-round-btn">▶ Next Round</button>
   <p id="results-waiting"></p>
 </div>
