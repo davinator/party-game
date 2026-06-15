@@ -25,6 +25,11 @@ const PLAY_TIME        = 120;
 const RESULTS_TIME     = 8;
 const DEFAULT_ROUNDS   = 6;
 
+const DEATH_ANIM_DUR  = 0.45; // seconds for the dismantle animation
+const DEATH_LIE_DUR   = 2.0;  // seconds body lies on ground
+const DEATH_FADE_DUR  = 0.5;  // seconds to fade out
+const DEATH_TOTAL     = DEATH_ANIM_DUR + DEATH_LIE_DUR + DEATH_FADE_DUR;
+
 const CAM_LERP = 0.1; // camera smoothing (lower = smoother/slower)
 const VERSION  = '0.1.36';
 
@@ -128,7 +133,7 @@ const WAITING_LEVEL = [
   { id:'d_elv',  type:'elevator',        x:1620, y:660, w:80,  h:30, permanent:true,
     rangeY:200 },
   // Right-section hazards — explore at your own risk
-  { id:'d_bh',   type:'black_hole',      x:3060, y:560, w:40,  h:40, permanent:true },
+  { id:'d_bh',   type:'black_hole',      x:2100, y:640, w:40,  h:40, permanent:true },
   { id:'d_can',  type:'cannon',          x:3130, y:788, w:32,  h:32, permanent:true,
     rotation:180 },
 ];
@@ -259,6 +264,7 @@ class Input {
   get down()    { return !!(this.k.ArrowDown  || this.k.KeyS); }
   get jumpHeld()    { return !!(this.k.Space || this.k.ArrowUp || this.k.KeyW); }
   get jumpPressed() { return this._jp.has('Space') || this._jp.has('ArrowUp') || this._jp.has('KeyW'); }
+  get dance()       { return !!(this.k.KeyZ); }
   pressed(code) { return this._jp.has(code); }
 }
 
@@ -370,6 +376,8 @@ class GO {
   }
 
   _drawAt(ctx, x, y, w, h) {
+    // Range track drawn before sprite so it sits behind the platform body
+    if (this.type === 'moving_platform') this._dMovingPlatTrack(ctx, w, h);
     if (sprites.draw(ctx, this.type, this._spriteAnim(), x, y, w, h)) return;
     switch(this.type) {
       case 'platform':        this._dPlat(ctx,x,y,w,h);         break;
@@ -389,36 +397,36 @@ class GO {
     }
   }
 
+  _dMovingPlatTrack(ctx, w, h) {
+    if (!this.rangeX && !this.rangeY) return;
+    const cx2 = this.baseX + w/2, cy2 = this.baseY + h/2;
+    ctx.save();
+    ctx.setLineDash([5,5]);
+    ctx.strokeStyle='rgba(255,255,255,0.22)'; ctx.lineWidth=2;
+    ctx.beginPath();
+    if (this.rangeX) {
+      ctx.moveTo(this.baseX - this.rangeX, cy2);
+      ctx.lineTo(this.baseX + this.rangeX + w, cy2);
+    } else {
+      ctx.moveTo(cx2, this.baseY - this.rangeY);
+      ctx.lineTo(cx2, this.baseY + this.rangeY + h);
+    }
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.strokeStyle='rgba(255,255,255,0.45)'; ctx.lineWidth=2;
+    const stops = this.rangeX
+      ? [[this.baseX - this.rangeX, cy2-8, this.baseX - this.rangeX, cy2+8],
+         [this.baseX + this.rangeX + w, cy2-8, this.baseX + this.rangeX + w, cy2+8]]
+      : [[cx2-8, this.baseY - this.rangeY, cx2+8, this.baseY - this.rangeY],
+         [cx2-8, this.baseY + this.rangeY + h, cx2+8, this.baseY + this.rangeY + h]];
+    stops.forEach(([x1,y1,x2,y2])=>{
+      ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke();
+    });
+    ctx.restore();
+  }
+
   _dMovingPlat(ctx, x, y, w, h) {
     const tc = this.team ? TEAM[this.team] : null;
-    // Range track line
-    if (this.rangeX || this.rangeY) {
-      const cx2 = this.baseX + w/2, cy2 = this.baseY + h/2;
-      ctx.save();
-      ctx.setLineDash([5,5]);
-      ctx.strokeStyle='rgba(255,255,255,0.22)'; ctx.lineWidth=2;
-      ctx.beginPath();
-      if (this.rangeX) {
-        ctx.moveTo(this.baseX - this.rangeX, cy2);
-        ctx.lineTo(this.baseX + this.rangeX + w, cy2);
-      } else {
-        ctx.moveTo(cx2, this.baseY - this.rangeY);
-        ctx.lineTo(cx2, this.baseY + this.rangeY + h);
-      }
-      ctx.stroke();
-      ctx.setLineDash([]);
-      // End-stop markers
-      ctx.strokeStyle='rgba(255,255,255,0.45)'; ctx.lineWidth=2;
-      const stops = this.rangeX
-        ? [[this.baseX - this.rangeX, cy2-8, this.baseX - this.rangeX, cy2+8],
-           [this.baseX + this.rangeX + w, cy2-8, this.baseX + this.rangeX + w, cy2+8]]
-        : [[cx2-8, this.baseY - this.rangeY, cx2+8, this.baseY - this.rangeY],
-           [cx2-8, this.baseY + this.rangeY + h, cx2+8, this.baseY + this.rangeY + h]];
-      stops.forEach(([x1,y1,x2,y2])=>{
-        ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke();
-      });
-      ctx.restore();
-    }
     // Platform body (purple tint to distinguish from static)
     ctx.fillStyle = tc ? tc.primary : '#6c5ce7';
     ctx.fillRect(x, y+5, w, h-5);
@@ -590,6 +598,10 @@ class Player {
     this.ghostMode=false;
     this.placementsLeft=0;
     this._riding=null;
+    this._deathT=-1;  // -1 = not dying; counts up to DEATH_TOTAL
+    this._deathCause='fall'; // 'fall' | 'spike' | 'shock' | 'projectile' | 'black_hole'
+    this._deathX=null; this._deathY=null; // saved position so body stays put while ghost roams
+    this._danceT=0;   // > 0 while holding Z or finished
     // Dead reckoning for remote players
     this._remX=0; this._remY=0; this._remVX=0; this._remVY=0; this._remAge=0;
   }
@@ -682,7 +694,7 @@ class Player {
         const f = BH_FORCE * (1 - dist/BH_PULL_RADIUS);
         this.vx += (dx/dist)*f; this.vy += (dy/dist)*f;
       }
-      if (dist < BH_KILL_RADIUS) return 'died';
+      if (dist < BH_KILL_RADIUS) return 'died:black_hole';
     }
 
     // Finished players have already landed their run — skip all die/finish checks
@@ -690,9 +702,16 @@ class Player {
 
     // Death / finish
     for (const hz of hazards) {
-      if (overlap(this.x+3,this.y+3,PW-6,PH-6, hz.x,hz.y,hz.w,hz.h)) return 'died';
+      if (hz.type === 'shock_platform') {
+        // No top/side inset and extend 1px below feet so standing on the surface triggers
+        if (overlap(this.x+3, this.y, PW-6, PH+1, hz.x, hz.y, hz.w, hz.h))
+          return 'died:shock';
+      } else {
+        if (overlap(this.x+3, this.y+3, PW-6, PH-6, hz.x, hz.y, hz.w, hz.h))
+          return 'died:spike';
+      }
     }
-    if (this.y>DEATH_Y) return 'died';
+    if (this.y>DEATH_Y) return 'died:fall';
     const finishZone = isBlue ? startZone : endZone;
     if (finishZone && overlap(this.x,this.y,PW,PH, finishZone.x,finishZone.y,finishZone.w,finishZone.h)) return 'finished';
 
@@ -731,6 +750,7 @@ class Player {
     this.vx=d.vx; this.vy=d.vy; this.facing=d.facing;
     this.onGround=d.onGround; this.state=d.state;
     this.walk=d.walk; this.ghostMode=d.ghostMode;
+    if (d.danceT !== undefined) this._danceT = d.danceT;
   }
 
   updateRemote(solids=[]) {
@@ -758,14 +778,21 @@ class Player {
   snap() {
     return { x:this.x, y:this.y, vx:this.vx, vy:this.vy,
              facing:this.facing, onGround:this.onGround,
-             state:this.state, walk:this.walk, ghostMode:this.ghostMode };
+             state:this.state, walk:this.walk, ghostMode:this.ghostMode,
+             danceT:this._danceT };
   }
 
   draw(ctx, isLocal, asGhost=false) {
-    const x=Math.round(isLocal && this._drawX!=null ? this._drawX : this.x);
-    const y=Math.round(this.y);
+    // During death sequence use saved position so body doesn't move with the ghost
+    const inDeathSeq = this._deathT >= 0 && this._deathT < DEATH_TOTAL;
+    const bx = Math.round(inDeathSeq && this._deathX != null ? this._deathX
+               : isLocal && this._drawX != null ? this._drawX : this.x);
+    const by = Math.round(inDeathSeq && this._deathY != null ? this._deathY : this.y);
+    const x = bx, y = by;
     const tc=TEAM[this.team];
-    ctx.globalAlpha = asGhost ? 0.38 : 1;
+
+    const effectiveGhost = asGhost && !inDeathSeq;
+    ctx.globalAlpha = effectiveGhost ? 0.38 : 1;
 
     const _anim = this.ghostMode          ? 'ghost'
       : this.state === 'finished'         ? 'finished'
@@ -773,25 +800,10 @@ class Player {
       : Math.abs(this.vx) > 0.5          ? 'walk' : 'idle';
 
     if (!sprites.draw(ctx, `player_${this.team}`, _anim, x, y, PW, PH, this.facing < 0)) {
-      if (!this.ghostMode) {
-        ctx.fillStyle='rgba(0,0,0,0.25)';
-        ctx.fillRect(x+3, y+PH+1, PW-6, 4);
-      }
-      ctx.fillStyle=tc.primary; ctx.fillRect(x,y,PW,PH);
-      ctx.fillStyle=tc.light;   ctx.fillRect(x+2,y+2,PW-4,10);
-      const ex = this.facing>0 ? x+PW-10 : x+3;
-      ctx.fillStyle='#fff'; ctx.fillRect(ex,y+5,6,6);
-      ctx.fillStyle='#111'; ctx.fillRect(ex+(this.facing>0?2:0),y+6,4,4);
-      if (this.onGround && !this.ghostMode) {
-        const sw=Math.sin(this.walk)*5;
-        ctx.fillStyle=tc.primary;
-        ctx.fillRect(x+3,    y+PH-6, 8, 6+sw);
-        ctx.fillRect(x+PW-11,y+PH-6, 8, 6-sw);
-      }
-      if (this.ghostMode) {
-        ctx.globalAlpha=0.18;
-        ctx.fillStyle=tc.light;
-        ctx.fillRect(x-4,y-4,PW+8,PH+8);
+      if (inDeathSeq) {
+        this._drawDeathAnim(ctx, x, y, tc);
+      } else {
+        this._drawBody(ctx, x, y, tc);
       }
     }
 
@@ -800,22 +812,360 @@ class Player {
     const _flipped=ctx.getTransform().a<0;
     const _cx=_flipped ? -(x+PW/2) : x+PW/2;
     ctx.save(); if (_flipped) ctx.scale(-1,1);
-    if (this.state==='finished') {
-      ctx.fillStyle='#f1c40f'; ctx.font='18px serif'; ctx.textAlign='center';
+    if (this.state==='finished' || this._danceT > 0) {
+      ctx.fillStyle='#f1c40f'; ctx.font='16px serif'; ctx.textAlign='center';
       ctx.fillText('★', _cx, y-5);
     }
     ctx.font='bold 10px monospace'; ctx.textAlign='center';
     const nm = this.name+(isLocal?' (you)':'');
     const nw = ctx.measureText(nm).width+8;
-    ctx.fillStyle='rgba(0,0,0,0.55)';
+    ctx.fillStyle = isLocal ? 'rgba(241,196,15,0.18)' : 'rgba(0,0,0,0.55)';
     ctx.fillRect(_cx-nw/2, y-20, nw, 14);
+    if (isLocal) {
+      ctx.strokeStyle='#f1c40f'; ctx.lineWidth=1.5;
+      ctx.strokeRect(_cx-nw/2, y-20, nw, 14);
+    }
     ctx.fillStyle=tc.light;
     ctx.fillText(nm, _cx, y-9);
     ctx.restore();
+  }
 
-    if (isLocal) {
-      ctx.strokeStyle='#f1c40f'; ctx.lineWidth=2;
-      ctx.strokeRect(x-2,y-2,PW+4,PH+4);
+  // Full animated character body
+  _drawBody(ctx, x, y, tc) {
+    const sw    = Math.sin(this.walk);
+    const inAir = !this.onGround;
+    const falling = inAir && this.vy > 2;
+
+    // Ghost players hover gently
+    const hoverY = this.ghostMode ? Math.round(Math.sin(Date.now() / 420) * 3) : 0;
+
+    // Dance phase: Z held → use _danceT; finished → auto-animate via time
+    const dancePhase = this._danceT > 0 ? this._danceT
+                     : this.state === 'finished' ? Date.now() / 600
+                     : 0;
+    const dancing = dancePhase > 0;
+
+    const ay = y - hoverY;  // vertically adjusted origin
+
+    // ── Legs ──
+    let llX = x+5, lrX = x+15, legY = ay+27;
+    let llH = 13, lrH = 13;
+
+    if (dancing) {
+      llH = 13 + Math.round(Math.sin(dancePhase * 6)           * 5);
+      lrH = 13 + Math.round(Math.sin(dancePhase * 6 + Math.PI) * 5);
+    } else if (falling) {
+      llX = x+3; lrX = x+17; llH = 11; lrH = 11;  // legs spread in fall
+    } else if (!inAir) {
+      // Stride: legs swing forward/back (X offset) instead of height change
+      llX = x+5 + Math.round(sw * 3);
+      lrX = x+15 - Math.round(sw * 3);
+    }
+
+    // White outline behind legs for visibility when crossing body
+    ctx.fillStyle = 'rgba(255,255,255,0.4)';
+    ctx.fillRect(llX-1, legY-1, 8, llH+2);
+    ctx.fillRect(lrX-1, legY-1, 8, lrH+2);
+    ctx.fillStyle = tc.primary;
+    ctx.fillRect(llX, legY, 6, Math.max(4, llH));
+    ctx.fillRect(lrX, legY, 6, Math.max(4, lrH));
+    ctx.fillStyle = tc.light;
+    ctx.fillRect(llX, legY, 6, 2);
+    ctx.fillRect(lrX, legY, 6, 2);
+
+    // ── Torso ──
+    ctx.fillStyle = tc.primary;
+    ctx.fillRect(x+7, ay+12, 12, 15);
+    ctx.fillStyle = tc.light;
+    ctx.fillRect(x+7, ay+12, 12, 3);
+
+    // ── Arms ──
+    let laY = ay+13, raY = ay+13, armH = 11;
+
+    if (dancing) {
+      laY  = ay+7 - Math.round(Math.sin(dancePhase * 6)           * 7);
+      raY  = ay+7 - Math.round(Math.sin(dancePhase * 6 + Math.PI) * 7);
+      armH = 13;
+    } else if (falling) {
+      laY = ay+3; raY = ay+3; armH = 14;  // arms fly up when falling
+    } else if (!inAir) {
+      laY = ay+13 - Math.round(sw * 4);   // swing opposite to legs
+      raY = ay+13 + Math.round(sw * 4);
+    }
+
+    // White outline behind arms
+    ctx.fillStyle = 'rgba(255,255,255,0.4)';
+    ctx.fillRect(x,    laY-1, 7, armH+2);
+    ctx.fillRect(x+19, raY-1, 7, armH+2);
+    ctx.fillStyle = tc.primary;
+    ctx.fillRect(x+1,  laY, 5, armH);
+    ctx.fillRect(x+20, raY, 5, armH);
+    ctx.fillStyle = tc.light;
+    ctx.fillRect(x+1,  laY, 5, 2);
+    ctx.fillRect(x+20, raY, 5, 2);
+
+    // ── Head ──
+    ctx.fillStyle = tc.light;
+    ctx.fillRect(x+4, ay+1, 18, 11);
+    ctx.fillStyle = tc.primary;
+    ctx.fillRect(x+4, ay+9, 18, 3);  // neck shadow at head base
+
+    // ── Eye ──
+    const eyeX = this.facing > 0 ? x+15 : x+5;
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(eyeX, ay+3, 5, 5);
+    const pupOff = this.facing > 0 ? 2 : 0;
+    ctx.fillStyle = '#111';
+    ctx.fillRect(eyeX+pupOff, ay+4, 3, 3);
+  }
+
+  // Simple static pose — used as base for death animation transforms
+  _drawBodySimple(ctx, x, y, tc) {
+    ctx.fillStyle = tc.primary;
+    ctx.fillRect(x+5,  y+27, 6,  13);  // left leg
+    ctx.fillRect(x+15, y+27, 6,  13);  // right leg
+    ctx.fillRect(x+1,  y+13, 5,  11);  // left arm
+    ctx.fillRect(x+20, y+13, 5,  11);  // right arm
+    ctx.fillRect(x+7,  y+12, 12, 15);  // torso
+    ctx.fillStyle = tc.light;
+    ctx.fillRect(x+4,  y+1,  18, 11);  // head
+    ctx.fillRect(x+1,  y+13, 5,  2);   // arm highlights
+    ctx.fillRect(x+20, y+13, 5,  2);
+    ctx.fillRect(x+5,  y+27, 6,  2);   // leg highlights
+    ctx.fillRect(x+15, y+27, 6,  2);
+    ctx.fillStyle = tc.primary;
+    ctx.fillRect(x+4,  y+9,  18, 3);   // neck shadow
+    const eyeX = this.facing > 0 ? x+15 : x+5;
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(eyeX, y+3, 5, 5);
+    const pupOff = this.facing > 0 ? 2 : 0;
+    ctx.fillStyle = '#111';
+    ctx.fillRect(eyeX+pupOff, y+4, 3, 3);
+  }
+
+  // Death: white flash → tips over → fades flat
+  _drawDeathAnim(ctx, x, y, tc) {
+    const dt = this._deathT;
+    if (dt < DEATH_ANIM_DUR) {
+      switch (this._deathCause) {
+        case 'shock':      this._drawDeathShock(ctx, x, y, tc);      break;
+        case 'projectile': this._drawDeathProjectile(ctx, x, y, tc); break;
+        case 'black_hole': this._drawDeathBlackHole(ctx, x, y, tc);  break;
+        default:           this._drawDeathDefault(ctx, x, y, tc);    break;
+      }
+    } else {
+      if (this._deathCause === 'black_hole') return;  // consumed — nothing to show
+      if (this._deathCause === 'projectile') { this._drawDeathProjectile(ctx, x, y, tc); return; }
+      // All other causes: lie flat then fade out
+      const alpha = dt >= DEATH_ANIM_DUR + DEATH_LIE_DUR
+        ? Math.max(0, 1 - (dt - DEATH_ANIM_DUR - DEATH_LIE_DUR) / DEATH_FADE_DUR)
+        : 1;
+      const fallY = this._deathFallY(y);
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      ctx.translate(0, fallY);
+      this._drawDeathFlat(ctx, x, y, tc);
+      ctx.restore();
+    }
+  }
+
+  _drawDeathFlat(ctx, x, y, tc) {
+    const cx = x + PW / 2;
+    this._drawLimbDeath(ctx, x+8,  y+27, x+5,  y+27, 6, 13,  Math.PI * 0.45, 10, tc);
+    this._drawLimbDeath(ctx, x+18, y+27, x+15, y+27, 6, 13, -Math.PI * 0.45, 10, tc);
+    this._drawLimbDeath(ctx, x+3,  y+14, x+1,  y+13, 5, 11,  Math.PI * 0.55, 26, tc);
+    this._drawLimbDeath(ctx, x+23, y+14, x+20, y+13, 5, 11, -Math.PI * 0.55, 26, tc);
+    ctx.save();
+    ctx.translate(cx, y + PH * 0.82);
+    ctx.rotate(Math.PI * 0.50 * this.facing);
+    ctx.translate(-cx, -(y + PH * 0.82));
+    ctx.fillStyle = tc.primary;
+    ctx.fillRect(x+7, y+12, 12, 15);
+    ctx.fillStyle = tc.light;
+    ctx.fillRect(x+7, y+12, 12, 3);
+    ctx.fillStyle = tc.light;
+    ctx.fillRect(x+4, y+1,  18, 11);
+    ctx.fillStyle = tc.primary;
+    ctx.fillRect(x+4, y+9,  18, 3);
+    const eyeX = this.facing > 0 ? x+15 : x+5;
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(eyeX, y+3, 5, 5);
+    ctx.fillStyle = '#111';
+    ctx.fillRect(eyeX + (this.facing > 0 ? 2 : 0), y+4, 3, 3);
+    ctx.restore();
+  }
+
+  _deathFallY(baseY) {
+    const maxFall = Math.max(0, WORLD_H - 80 - PH - baseY);
+    const n = this._deathT * 60;
+    return Math.min(maxFall, 0.5 * GRAVITY * n * n);
+  }
+
+  _drawDeathDefault(ctx, x, y, tc) {
+    const t  = this._deathT / DEATH_ANIM_DUR;
+    const cx = x + PW / 2;
+    const rt   = Math.min(1, t);
+    const ease = rt * rt; // gravity acceleration for everything
+    const fallY = this._deathFallY(y);
+
+    ctx.save();
+    ctx.translate(0, fallY);
+
+    // Left leg: splay left + fall to ground
+    this._drawLimbDeath(ctx, x+8,  y+27, x+5,  y+27, 6, 13,  ease * Math.PI * 0.45, ease * 10, tc);
+    // Right leg: splay right + fall to ground
+    this._drawLimbDeath(ctx, x+18, y+27, x+15, y+27, 6, 13, -ease * Math.PI * 0.45, ease * 10, tc);
+    // Left arm: fall left + drop to ground level (shoulder at y+14, ground at y+40)
+    this._drawLimbDeath(ctx, x+3,  y+14, x+1,  y+13, 5, 11,  ease * Math.PI * 0.55, ease * 26, tc);
+    // Right arm: fall right + drop to ground level
+    this._drawLimbDeath(ctx, x+23, y+14, x+20, y+13, 5, 11, -ease * Math.PI * 0.55, ease * 26, tc);
+
+    // Upper body tips over toward facing dir, pivot near foot level
+    ctx.save();
+    ctx.translate(cx, y + PH * 0.82);
+    ctx.rotate(ease * Math.PI * 0.50 * this.facing);
+    ctx.translate(-cx, -(y + PH * 0.82));
+    ctx.fillStyle = tc.primary;
+    ctx.fillRect(x+7, y+12, 12, 15);
+    ctx.fillStyle = tc.light;
+    ctx.fillRect(x+7, y+12, 12, 3);
+    ctx.fillStyle = tc.light;
+    ctx.fillRect(x+4, y+1,  18, 11);
+    ctx.fillStyle = tc.primary;
+    ctx.fillRect(x+4, y+9,  18, 3);
+    const eyeX = this.facing > 0 ? x+15 : x+5;
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(eyeX, y+3, 5, 5);
+    ctx.fillStyle = '#111';
+    ctx.fillRect(eyeX + (this.facing > 0 ? 2 : 0), y+4, 3, 3);
+    ctx.restore();
+
+    ctx.restore();
+  }
+
+  _drawLimbDeath(ctx, px, py, lx, ly, lw, lh, angle, offY, tc) {
+    ctx.save();
+    ctx.translate(0, offY);   // gravity: drop whole limb down
+    ctx.translate(px, py);
+    ctx.rotate(angle);
+    ctx.translate(-px, -py);
+    ctx.fillStyle = tc.primary;
+    ctx.fillRect(lx, ly, lw, lh);
+    ctx.fillStyle = tc.light;
+    ctx.fillRect(lx, ly, lw, 2);
+    ctx.restore();
+  }
+
+  _drawDeathShock(ctx, x, y, tc) {
+    this._drawDeathDefault(ctx, x, y, tc);
+    const t = this._deathT / DEATH_ANIM_DUR;
+    if (t > 0.72) return;
+    // Flicker at ~20Hz — only draw on "on" frames
+    if (Math.sin(this._deathT * 125) < 0) return;
+    const fallY = this._deathFallY(y);
+    const cx = x + PW / 2, cy = y + PH / 2 + fallY;
+    ctx.save();
+    // 5 lightning bolts radiating out from character center
+    const bolts = [
+      [cx, cy - 6,  cx - 22, cy - 22],
+      [cx, cy - 6,  cx + 22, cy - 20],
+      [cx - 4, cy,  cx - 24, cy + 8],
+      [cx + 4, cy,  cx + 24, cy + 6],
+      [cx, cy + 6,  cx + 10, cy + 26],
+    ];
+    bolts.forEach(([sx, sy, ex, ey], i) => {
+      const mx = (sx + ex) / 2 + (i % 2 === 0 ? -5 : 5);
+      const my = (sy + ey) / 2 + (i < 3 ? -4 : 4);
+      const useWhite = Math.sin(this._deathT * 200 + i * 1.3) > 0;
+      ctx.beginPath();
+      ctx.moveTo(sx, sy);
+      ctx.lineTo(mx, my);
+      ctx.lineTo(ex, ey);
+      ctx.strokeStyle = useWhite ? 'rgba(255,255,255,0.95)' : 'rgba(80,190,255,0.90)';
+      ctx.lineWidth = useWhite ? 2 : 1.5;
+      ctx.shadowColor = '#4fc3f7';
+      ctx.shadowBlur = 6;
+      ctx.stroke();
+    });
+    // Glow ring
+    const glow = ctx.createRadialGradient(cx, cy, 4, cx, cy, 20);
+    glow.addColorStop(0, 'rgba(80,190,255,0.28)');
+    glow.addColorStop(1, 'rgba(80,190,255,0)');
+    ctx.fillStyle = glow;
+    ctx.beginPath();
+    ctx.arc(cx, cy, 20, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  _drawDeathProjectile(ctx, x, y, tc) {
+    const dt  = this._deathT;
+    const n   = dt * 60;               // frames elapsed
+    const kd  = -this.facing;          // knock direction (opposite to facing)
+    const VX  = kd * 3.0;             // px/frame horizontal
+    const VY0 = -8.0;                  // px/frame — upward kick on impact
+    // Landing frame: when body returns to death height (offY = 0, going down)
+    const n_land = -2 * VY0 / GRAVITY; // ≈ 29 frames ≈ 0.485s
+
+    const offX = VX * n;
+    const offY = VY0 * n + 0.5 * GRAVITY * n * n;
+
+    const px = x + PW / 2;
+    const py = y + PH / 2;
+
+    if (n < n_land) {
+      // Body fell into the void — nothing to draw, lie timer still runs
+      if (offY > 160) return;
+      // Airborne: physics translation + constant spin
+      const spin = kd * n * 0.20;
+      ctx.save();
+      ctx.translate(px + offX, py + offY);
+      ctx.rotate(spin);
+      ctx.translate(-px, -py);
+      this._drawBodySimple(ctx, x, y, tc);
+      ctx.restore();
+    } else {
+      // Landed: body lies flat at the landing X position
+      const landX = Math.round(VX * n_land);
+      const alpha = dt >= DEATH_ANIM_DUR + DEATH_LIE_DUR
+        ? Math.max(0, 1 - (dt - DEATH_ANIM_DUR - DEATH_LIE_DUR) / DEATH_FADE_DUR)
+        : 1;
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      this._drawDeathFlat(ctx, x + landX, y, tc);
+      ctx.restore();
+    }
+  }
+
+  _drawDeathBlackHole(ctx, x, y, tc) {
+    const t  = this._deathT / DEATH_ANIM_DUR;
+    const px = x + PW / 2;
+    const py = y + PH / 2;
+    const scale = Math.max(0, 1 - t);
+    const spin  = t * Math.PI * 7; // ~3.5 full rotations
+    ctx.save();
+    ctx.translate(px, py);
+    ctx.rotate(spin);
+    ctx.scale(scale, scale);
+    ctx.translate(-px, -py);
+    this._drawBodySimple(ctx, x, y, tc);
+    ctx.restore();
+    // Swirling arc particles converging inward
+    if (t < 0.88) {
+      ctx.save();
+      ctx.globalAlpha = 0.85;
+      const r = 22 * scale + 4;
+      for (let i = 0; i < 3; i++) {
+        const a0 = spin + i * Math.PI * 2 / 3;
+        ctx.beginPath();
+        ctx.arc(px, py, r, a0, a0 + Math.PI * 0.65);
+        ctx.strokeStyle = i % 2 === 0 ? 'rgba(170,50,220,0.92)' : 'rgba(220,180,255,0.80)';
+        ctx.lineWidth = 2.5;
+        ctx.shadowColor = '#9b59b6';
+        ctx.shadowBlur = 8;
+        ctx.stroke();
+      }
+      ctx.restore();
     }
   }
 }
@@ -1506,7 +1856,9 @@ class Game {
     net.on('player_event', msg=>{
       const p=this.players[msg.playerId]; if (!p) return;
       if (msg.event==='died') {
-        p.state='dead'; p.ghostMode=true;
+        p._deathCause = msg.cause || 'fall';
+        p._deathX = p.x; p._deathY = p.y;
+        p.state='dead'; p.ghostMode=true; p._deathT=0;
         if (this.phase==='play') this._deathOrder.push(msg.playerId);
       }
       if (msg.event==='finished') { p.state='finished'; p.ghostMode=false; }
@@ -1723,7 +2075,23 @@ class Game {
       this._phaseTime += 1/60;
       this.level.update(this._phaseTime);
       const lp = this.localPlayer;
-      if (lp) lp.updateLocal(this.input, this.level, false, false);
+      if (lp) {
+        if (lp._deathT >= DEATH_TOTAL) {
+          // Respawn after contemplating the corpse
+          const sp = this.level.startPos();
+          lp.x=sp.x; lp.y=sp.y; lp.vx=0; lp.vy=0; lp.onGround=false;
+          lp._deathT=-1;
+        } else if (lp._deathT >= 0) {
+          // Currently dying / lying — controls frozen, timer ticking via the global loop above
+        } else {
+          const evt = lp.updateLocal(this.input, this.level, false, false);
+          if (evt && evt.startsWith('died')) {
+            lp._deathCause = evt.startsWith('died:') ? evt.slice(5) : 'fall';
+            lp._deathX = lp.x; lp._deathY = lp.y;
+            lp._deathT = 0;
+          }
+        }
+      }
       for (const p of Object.values(this.players)) {
         if (p.id !== this.localId) p.updateRemote(this.level.solids);
       }
@@ -1731,6 +2099,10 @@ class Game {
       if (lp) {
         const iv = this._sendInterval();
         if (this._sendTick % iv === 0) this.net.broadcast({ type:'player_update', ...lp.snap() });
+      }
+      // Tick death timers (waiting phase returns before the main timer loop below)
+      for (const p of Object.values(this.players)) {
+        if (p._deathT >= 0 && p._deathT < DEATH_TOTAL) p._deathT += 1/60;
       }
       return;
     }
@@ -1753,6 +2125,11 @@ class Game {
       }
     }
 
+    // Always tick death timers so animations play through phase transitions
+    for (const p of Object.values(this.players)) {
+      if (p._deathT >= 0 && p._deathT < DEATH_TOTAL) p._deathT += 1/60;
+    }
+
     if (this.phase==='countdown') { this._updateHUD(); this._updateResultsPanel(); this._updateFinishModal(); this._updateForceEndBtn(); return; }
     if (this.phase==='results')   { this._updateHUD(); this._updateResultsPanel(); this._updateFinishModal(); this._updateForceEndBtn(); return; }
     if (this.phase==='gameover')  { this._updateHUD(); this._updateResultsPanel(); this._updateFinishModal(); this._updateForceEndBtn(); return; }
@@ -1770,9 +2147,12 @@ class Game {
         this.net.broadcast({ type:'platform_trigger', id:ridingNow.id, t:this._phaseTime });
       }
 
-      const _died = (evt==='died' && lp.state==='alive') ||
-        (lp.state==='alive' && this.level.projectilesAt(this._phaseTime)
-          .some(p=>circleRect(p.x,p.y,p.r, lp.x,lp.y,PW,PH)));
+      const diedByPhysics = evt && evt.startsWith('died') && lp.state==='alive';
+      const diedByProjectile = lp.state==='alive' && this.level.projectilesAt(this._phaseTime)
+          .some(p=>circleRect(p.x,p.y,p.r, lp.x,lp.y,PW,PH));
+      const _died = diedByPhysics || diedByProjectile;
+      const deathCause = diedByProjectile ? 'projectile'
+        : (evt && evt.startsWith('died:') ? evt.slice(5) : 'fall');
 
       if (_died) {
         if (this.phase==='build') {
@@ -1781,8 +2161,10 @@ class Game {
           lp.x=sp.x; lp.y=sp.y; lp.vx=0; lp.vy=0; lp.onGround=false; lp._coyote=0; lp._jbuf=0;
         } else {
           // Play phase: permanent death → ghost
-          lp.state='dead'; lp.ghostMode=true;
-          this.net.broadcast({ type:'player_event', playerId:this.localId, event:'died' });
+          lp._deathCause = deathCause;
+          lp._deathX = lp.x; lp._deathY = lp.y;
+          lp.state='dead'; lp.ghostMode=true; lp._deathT=0;
+          this.net.broadcast({ type:'player_event', playerId:this.localId, event:'died', cause:deathCause });
           this._deathOrder.push(this.localId);
           const tot=Object.keys(this.players).length;
           lp.placementsLeft = this._deathOrder.length<=Math.ceil(tot*0.5) ? 1 : 0;
@@ -1811,6 +2193,13 @@ class Game {
 
     for (const p of Object.values(this.players)) {
       if (p.id !== this.localId) p.updateRemote(this.level.solids);
+    }
+
+    // Dance timer: increment while Z held (any state except dead); reset on release
+    if (lp) {
+      if (this.input.dance && lp.state !== 'dead') lp._danceT += 1/60;
+      else if (lp.state === 'dead') lp._danceT = 0;
+      else if (!this.input.dance) lp._danceT = 0;
     }
 
     this._sendTick=(this._sendTick||0)+1;
@@ -1924,7 +2313,7 @@ class Game {
     const localIsAlive = this.phase==='play' && lp?.state==='alive';
     Object.values(this.players)
       .filter(p => p.id !== this.localId)
-      .filter(p => !(localIsAlive && p.ghostMode))
+      .filter(p => !(localIsAlive && p.ghostMode && !(p._deathT >= 0 && p._deathT < DEATH_TOTAL)))
       .forEach(p => p.draw(ctx, false, p.ghostMode));
 
     if (lp) {
