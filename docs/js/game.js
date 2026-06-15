@@ -238,6 +238,51 @@ class SpriteLoader {
 
 const sprites = new SpriteLoader();
 
+const CHAR_TYPES = ['c1','c2','c3','c4','c5'];
+
+class SoundManager {
+  constructor() { this._ctx = null; this._bufs = {}; }
+
+  async load() {
+    try { this._ctx = new (window.AudioContext || window.webkitAudioContext)(); }
+    catch(e) { return; }
+    const sounds = ['jump_1','jump_2','jump_3','death_sharp','death_electric','death_fall','death_blackhole','death_blunt','dance'];
+    await Promise.all(CHAR_TYPES.flatMap(c => sounds.map(s =>
+      fetch(`sounds/${c}/${s}.wav`)
+        .then(r => r.ok ? r.arrayBuffer() : null)
+        .then(ab => ab ? this._ctx.decodeAudioData(ab) : null)
+        .then(buf => { if (buf) this._bufs[`${c}/${s}`] = buf; })
+        .catch(()=>{})
+    )));
+  }
+
+  play(charType, sound, volume = 1) {
+    if (!this._ctx) return;
+    const buf = this._bufs[`${charType}/${sound}`];
+    if (!buf) return;
+    if (this._ctx.state === 'suspended') this._ctx.resume();
+    const src = this._ctx.createBufferSource();
+    src.buffer = buf;
+    const gain = this._ctx.createGain();
+    gain.gain.value = Math.max(0, Math.min(1, volume));
+    src.connect(gain);
+    gain.connect(this._ctx.destination);
+    src.start(0);
+  }
+
+  playJump(charType, volume = 1) {
+    const s = `jump_${1 + Math.floor(Math.random() * 3)}`;
+    this.play(charType, s, volume);
+    return s;
+  }
+
+  playDeath(charType, cause, volume = 1) {
+    const MAP = { spike:'death_sharp', shock:'death_electric', fall:'death_fall', black_hole:'death_blackhole', projectile:'death_blunt' };
+    this.play(charType, MAP[cause] || 'death_fall', volume);
+  }
+}
+const sfx = new SoundManager();
+
 // ─────────────────────────────────────────────
 class Input {
   constructor(canvas) {
@@ -722,6 +767,8 @@ class Player {
     this._deathFloorY=null;      // first solid surface below death position
     this._deathProjFloorY=null;  // first solid below projectile landing spot
     this._danceT=0;   // > 0 while holding Z or finished
+    this.charType='c1';
+    this._justJumped=false;
     // Dead reckoning for remote players
     this._remX=0; this._remY=0; this._remVX=0; this._remVY=0; this._remAge=0;
   }
@@ -770,6 +817,7 @@ class Player {
     if (this._jbuf>0) {
       if (this._coyote>0) {
         this.vy=JUMP_VEL; this._jbuf=0; this._coyote=0; this.onGround=false;
+        this._justJumped=true;
       } else {
         this._jbuf--;
       }
@@ -884,6 +932,7 @@ class Player {
     this.onGround=d.onGround; this.state=d.state;
     this.walk=d.walk; this.ghostMode=d.ghostMode;
     if (d.danceT !== undefined) this._danceT = d.danceT;
+    if (d.charType) this.charType = d.charType;
   }
 
   updateRemote(solids=[]) {
@@ -912,7 +961,7 @@ class Player {
     return { x:this.x, y:this.y, vx:this.vx, vy:this.vy,
              facing:this.facing, onGround:this.onGround,
              state:this.state, walk:this.walk, ghostMode:this.ghostMode,
-             danceT:this._danceT };
+             danceT:this._danceT, charType:this.charType };
   }
 
   draw(ctx, isLocal, asGhost=false) {
@@ -1914,6 +1963,7 @@ class Game {
   }
 
   async _join(url, roomId, name, team) {
+    sfx.load();
     const btn=document.getElementById('join-btn');
     btn.disabled=true; btn.textContent='Connecting…';
     this.localId=uid();
@@ -1967,6 +2017,8 @@ class Game {
         const lp = this.localPlayer;
         if (lp) { lp.state='dead'; lp.ghostMode=true; lp.placementsLeft=0; lp._buildDone=true; }
       }
+        const lp = this.localPlayer;
+        if (lp) lp.charType = CHAR_TYPES[Object.values(this.players).filter(p=>p.id!==this.localId).length % CHAR_TYPES.length];
     });
 
     net.on('state_request', msg=>{
@@ -2010,6 +2062,7 @@ class Game {
     net.on('player_event', msg=>{
       const p=this.players[msg.playerId]; if (!p) return;
       if (msg.event==='died') {
+        sfx.playDeath(p.charType || 'c1', msg.cause || 'fall', 0.85);
         p._deathCause = msg.cause || 'fall';
         p._deathX = p.x; p._deathY = p.y;
         p._deathFloorY = this.level.floorBelow(p._deathX, p._deathY);
@@ -2041,6 +2094,19 @@ class Game {
     });
     net.on('reconnected',()=>{ _banner.classList.add('hidden'); });
     net.on('disconnected',()=>{ _banner.classList.remove('hidden'); _bannerMsg.textContent='Disconnected from server.'; });
+
+    net.on('sound_event', msg=>{
+      if (!msg.charType || !msg.sound) return;
+      const lp = this.localPlayer;
+      const sender = msg.playerId ? this.players[msg.playerId] : null;
+      let vol = 0.85;
+      if (sender && lp) {
+        const dx = (sender.x + PW/2) - (lp.x + PW/2);
+        const dy = (sender.y + PH/2) - (lp.y + PH/2);
+        vol = Math.max(0, 1 - Math.sqrt(dx*dx + dy*dy) / 1000) * 0.85;
+      }
+      sfx.play(msg.charType, msg.sound, vol);
+    });
   }
 
   _addPlayer(id,name,team,colorIdx) {
@@ -2271,6 +2337,12 @@ class Game {
         const evt=lp.updateLocal(this.input, this.level,
           this.phase!=='waiting' && this.placement.active);
 
+        if (lp._justJumped) {
+          const snd = sfx.playJump(lp.charType);
+          this.net.broadcast({ type:'sound_event', playerId:this.localId, charType:lp.charType, sound:snd });
+          lp._justJumped = false;
+        }
+
         this._resolvePlayerCollisions();
 
         // Trigger disappearing platform on first contact
@@ -2300,6 +2372,7 @@ class Game {
               const projLandX = lp._deathX + (-lp.facing * 3.0) * (2 * 8.0 / GRAVITY);
               lp._deathProjFloorY = this.level.floorBelow(projLandX, lp._deathY);
             } else { lp._deathProjFloorY = null; }
+            sfx.playDeath(lp.charType, deathCause);
             lp._deathT = 0;
           } else if (this.phase==='build') {
             // Build phase: instant respawn
@@ -2315,6 +2388,7 @@ class Game {
               lp._deathProjFloorY = this.level.floorBelow(projLandX, lp._deathY);
             } else { lp._deathProjFloorY = null; }
             lp.state='dead'; lp.ghostMode=true; lp._deathT=0;
+            sfx.playDeath(lp.charType, deathCause);
             this.net.broadcast({ type:'player_event', playerId:this.localId, event:'died', cause:deathCause });
             this._deathOrder.push(this.localId);
             const tot=Object.keys(this.players).length;
@@ -2349,7 +2423,13 @@ class Game {
 
     // Dance timer: increment while Z held (any state except dead); reset on release
     if (lp) {
-      if (this.input.dance && lp.state !== 'dead') lp._danceT += 1/60;
+      if (this.input.dance && lp.state !== 'dead') {
+        if (lp._danceT === 0) {
+          sfx.play(lp.charType, 'dance');
+          this.net.broadcast({ type:'sound_event', playerId:this.localId, charType:lp.charType, sound:'dance' });
+        }
+        lp._danceT += 1/60;
+      }
       else if (lp.state === 'dead') lp._danceT = 0;
       else if (!this.input.dance) lp._danceT = 0;
     }
