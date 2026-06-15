@@ -2395,7 +2395,7 @@ class Game {
           this.phase!=='waiting' && this.placement.active);
 
         if (lp._justJumped) {
-          const snd = sfx.playJump(lp.charType);
+          const snd = sfx.playJump(lp.charType, 0.65);
           this.net.broadcast({ type:'sound_event', playerId:this.localId, charType:lp.charType, sound:snd });
           lp._justJumped = false;
         }
