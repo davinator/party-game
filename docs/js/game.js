@@ -845,49 +845,41 @@ class Player {
 
   // Full animated character body
   _drawBody(ctx, x, y, tc) {
-    const sw    = Math.sin(this.walk);
-    const inAir = !this.onGround;
+    const sw      = Math.sin(this.walk);
+    const inAir   = !this.onGround;
     const falling = inAir && this.vy > 2;
+    const hoverY  = this.ghostMode ? Math.round(Math.sin(Date.now() / 420) * 3) : 0;
 
-    // Ghost players hover gently
-    const hoverY = this.ghostMode ? Math.round(Math.sin(Date.now() / 420) * 3) : 0;
-
-    // Dance phase: Z held → use _danceT; finished → auto-animate via time
     const dancePhase = this._danceT > 0 ? this._danceT
-                     : this.state === 'finished' ? Date.now() / 600
-                     : 0;
+                     : this.state === 'finished' ? Date.now() / 600 : 0;
     const dancing = dancePhase > 0;
 
-    const ay = y - hoverY;  // vertically adjusted origin
+    // Dance beat: whole body bounces up slightly on each beat
+    const danceBob = dancing ? Math.round(Math.abs(Math.sin(dancePhase * 7)) * 3) : 0;
+    const ay = y - hoverY - danceBob;
+
+    // Reusable limb drawers (called inside save/translate/rotate blocks)
+    const arm = () => {
+      ctx.fillStyle='rgba(255,255,255,0.4)'; ctx.fillRect(-3,-1,7,13);
+      ctx.fillStyle=tc.primary;               ctx.fillRect(-2, 0,5,11);
+      ctx.fillStyle=tc.light;                 ctx.fillRect(-2, 0,5, 2);
+    };
+    const leg = () => {
+      ctx.fillStyle='rgba(255,255,255,0.4)'; ctx.fillRect(-4,-1,8,15);
+      ctx.fillStyle=tc.primary;               ctx.fillRect(-3, 0,6,13);
+      ctx.fillStyle=tc.light;                 ctx.fillRect(-3, 0,6, 2);
+    };
 
     // ── Legs ──
     if (dancing) {
-      const llH = 13 + Math.round(Math.sin(dancePhase * 6)           * 5);
-      const lrH = 13 + Math.round(Math.sin(dancePhase * 6 + Math.PI) * 5);
-      ctx.fillStyle = 'rgba(255,255,255,0.4)';
-      ctx.fillRect(x+4,  ay+26, 8, llH+2);
-      ctx.fillRect(x+14, ay+26, 8, lrH+2);
-      ctx.fillStyle = tc.primary;
-      ctx.fillRect(x+5,  ay+27, 6, Math.max(4, llH));
-      ctx.fillRect(x+15, ay+27, 6, Math.max(4, lrH));
-      ctx.fillStyle = tc.light;
-      ctx.fillRect(x+5,  ay+27, 6, 2);
-      ctx.fillRect(x+15, ay+27, 6, 2);
+      const dt = dancePhase * 7;
+      ctx.save(); ctx.translate(x+10, ay+27); ctx.rotate( Math.sin(dt) * 0.5); leg(); ctx.restore();
+      ctx.save(); ctx.translate(x+16, ay+27); ctx.rotate(-Math.sin(dt) * 0.5); leg(); ctx.restore();
     } else if (!inAir) {
-      // Pivot from hip: each leg swings forward/backward like a pendulum
       const la = sw * 0.4;
-      ctx.save(); ctx.translate(x+10, ay+27); ctx.rotate(la);
-      ctx.fillStyle='rgba(255,255,255,0.4)'; ctx.fillRect(-4,-1,8,15);
-      ctx.fillStyle=tc.primary;               ctx.fillRect(-3, 0,6,13);
-      ctx.fillStyle=tc.light;                 ctx.fillRect(-3, 0,6, 2);
-      ctx.restore();
-      ctx.save(); ctx.translate(x+16, ay+27); ctx.rotate(-la);
-      ctx.fillStyle='rgba(255,255,255,0.4)'; ctx.fillRect(-4,-1,8,15);
-      ctx.fillStyle=tc.primary;               ctx.fillRect(-3, 0,6,13);
-      ctx.fillStyle=tc.light;                 ctx.fillRect(-3, 0,6, 2);
-      ctx.restore();
+      ctx.save(); ctx.translate(x+10, ay+27); ctx.rotate( la); leg(); ctx.restore();
+      ctx.save(); ctx.translate(x+16, ay+27); ctx.rotate(-la); leg(); ctx.restore();
     } else {
-      // Airborne: falling fast = legs spread apart, otherwise straight
       const llX = falling ? x+3 : x+5;
       const lrX = falling ? x+17 : x+15;
       const legH = falling ? 11 : 13;
@@ -908,59 +900,11 @@ class Player {
     ctx.fillStyle = tc.light;
     ctx.fillRect(x+8, ay+12, 10, 3);
 
-    // ── Arms ──
-    if (dancing) {
-      const laY = ay+7 - Math.round(Math.sin(dancePhase * 6)           * 7);
-      const raY = ay+7 - Math.round(Math.sin(dancePhase * 6 + Math.PI) * 7);
-      const armH = 13;
-      ctx.fillStyle = 'rgba(255,255,255,0.4)';
-      ctx.fillRect(x,    laY-1, 7, armH+2);
-      ctx.fillRect(x+19, raY-1, 7, armH+2);
-      ctx.fillStyle = tc.primary;
-      ctx.fillRect(x+1,  laY, 5, armH);
-      ctx.fillRect(x+20, raY, 5, armH);
-      ctx.fillStyle = tc.light;
-      ctx.fillRect(x+1,  laY, 5, 2);
-      ctx.fillRect(x+20, raY, 5, 2);
-    } else if (falling) {
-      // \o/ pose — arms spread wide up and outward
-      ctx.save(); ctx.translate(x+6, ay+12); ctx.rotate(-2.4);
-      ctx.fillStyle='rgba(255,255,255,0.4)'; ctx.fillRect(-3,-1,7,13);
-      ctx.fillStyle=tc.primary;               ctx.fillRect(-2, 0,5,11);
-      ctx.fillStyle=tc.light;                 ctx.fillRect(-2, 0,5, 2);
-      ctx.restore();
-      ctx.save(); ctx.translate(x+20, ay+12); ctx.rotate(2.4);
-      ctx.fillStyle='rgba(255,255,255,0.4)'; ctx.fillRect(-3,-1,7,13);
-      ctx.fillStyle=tc.primary;               ctx.fillRect(-2, 0,5,11);
-      ctx.fillStyle=tc.light;                 ctx.fillRect(-2, 0,5, 2);
-      ctx.restore();
-    } else if (!inAir && Math.abs(this.vx) > 0.4) {
-      // Walking: single arm in body center swings across the torso
-      const aa = sw * 0.5;
-      ctx.save(); ctx.translate(x+13, ay+13); ctx.rotate(aa);
-      ctx.fillStyle='rgba(255,255,255,0.4)'; ctx.fillRect(-3,-1,7,13);
-      ctx.fillStyle=tc.primary;               ctx.fillRect(-2, 0,5,11);
-      ctx.fillStyle=tc.light;                 ctx.fillRect(-2, 0,5, 2);
-      ctx.restore();
-    } else {
-      // Stopped or airborne — arms close to body, slight outward tilt
-      ctx.save(); ctx.translate(x+6, ay+13); ctx.rotate(0.15);
-      ctx.fillStyle='rgba(255,255,255,0.4)'; ctx.fillRect(-3,-1,7,13);
-      ctx.fillStyle=tc.primary;               ctx.fillRect(-2, 0,5,11);
-      ctx.fillStyle=tc.light;                 ctx.fillRect(-2, 0,5, 2);
-      ctx.restore();
-      ctx.save(); ctx.translate(x+20, ay+13); ctx.rotate(-0.15);
-      ctx.fillStyle='rgba(255,255,255,0.4)'; ctx.fillRect(-3,-1,7,13);
-      ctx.fillStyle=tc.primary;               ctx.fillRect(-2, 0,5,11);
-      ctx.fillStyle=tc.light;                 ctx.fillRect(-2, 0,5, 2);
-      ctx.restore();
-    }
-
     // ── Head ──
     ctx.fillStyle = tc.light;
     ctx.fillRect(x+6, ay+1, 14, 11);
     ctx.fillStyle = tc.primary;
-    ctx.fillRect(x+6, ay+9, 14, 3);  // neck shadow at head base
+    ctx.fillRect(x+6, ay+9, 14, 3);
 
     // ── Eye ──
     const eyeX = this.facing > 0 ? x+13 : x+7;
@@ -969,6 +913,27 @@ class Player {
     const pupOff = this.facing > 0 ? 2 : 0;
     ctx.fillStyle = '#111';
     ctx.fillRect(eyeX+pupOff, ay+4, 3, 3);
+
+    // ── Arms (drawn last so raised arms render in front of the head) ──
+    if (dancing) {
+      // Alternating raise: left arm pumps up on positive beat, right on negative
+      const beat = Math.sin(dancePhase * 7);
+      const la =  0.15 - Math.max(0,  beat) * 2.45;
+      const ra = -0.15 + Math.max(0, -beat) * 2.45;
+      ctx.save(); ctx.translate(x+6,  ay+13); ctx.rotate(la); arm(); ctx.restore();
+      ctx.save(); ctx.translate(x+20, ay+13); ctx.rotate(ra); arm(); ctx.restore();
+    } else if (falling) {
+      // \o/ — arms spread wide and up
+      ctx.save(); ctx.translate(x+6,  ay+12); ctx.rotate(-2.4); arm(); ctx.restore();
+      ctx.save(); ctx.translate(x+20, ay+12); ctx.rotate( 2.4); arm(); ctx.restore();
+    } else if (!inAir && Math.abs(this.vx) > 0.4) {
+      // Walking: single center arm swings across the torso
+      ctx.save(); ctx.translate(x+13, ay+13); ctx.rotate(sw * 0.5); arm(); ctx.restore();
+    } else {
+      // Idle: arms close to body, slight outward tilt
+      ctx.save(); ctx.translate(x+6,  ay+13); ctx.rotate( 0.15); arm(); ctx.restore();
+      ctx.save(); ctx.translate(x+20, ay+13); ctx.rotate(-0.15); arm(); ctx.restore();
+    }
   }
 
   // Simple static pose — used as base for death animation transforms
