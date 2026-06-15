@@ -961,15 +961,20 @@ class Player {
   // Death: white flash → tips over → fades flat
   _drawDeathAnim(ctx, x, y, tc) {
     const dt = this._deathT;
+
+    // Black hole has its own extended ease-in duration — handle before the shared gate
+    if (this._deathCause === 'black_hole') {
+      if (dt < DEATH_ANIM_DUR * 2) this._drawDeathBlackHole(ctx, x, y, tc);
+      return; // nothing after consumption
+    }
+
     if (dt < DEATH_ANIM_DUR) {
       switch (this._deathCause) {
         case 'shock':      this._drawDeathShock(ctx, x, y, tc);      break;
         case 'projectile': this._drawDeathProjectile(ctx, x, y, tc); break;
-        case 'black_hole': this._drawDeathBlackHole(ctx, x, y, tc);  break;
         default:           this._drawDeathDefault(ctx, x, y, tc);    break;
       }
     } else {
-      if (this._deathCause === 'black_hole') return;  // consumed — nothing to show
       if (this._deathCause === 'projectile') { this._drawDeathProjectile(ctx, x, y, tc); return; }
       // All other causes: lie flat then fade out
       const alpha = dt >= DEATH_ANIM_DUR + DEATH_LIE_DUR
@@ -1160,11 +1165,12 @@ class Player {
   }
 
   _drawDeathBlackHole(ctx, x, y, tc) {
-    const t  = this._deathT / DEATH_ANIM_DUR;
+    const rawT = Math.min(1, this._deathT / (DEATH_ANIM_DUR * 2));
+    const t    = rawT * rawT * rawT; // cubic ease-in: slow drift → rapid consumption
     const px = x + PW / 2;
     const py = y + PH / 2;
     const scale = Math.max(0, 1 - t);
-    const spin  = t * Math.PI * 7; // ~3.5 full rotations
+    const spin  = t * Math.PI * 10; // ~5 full rotations, most happening at the end
     ctx.save();
     ctx.translate(px, py);
     ctx.rotate(spin);
@@ -1173,7 +1179,7 @@ class Player {
     this._drawBodySimple(ctx, x, y, tc);
     ctx.restore();
     // Swirling arc particles converging inward
-    if (t < 0.88) {
+    if (rawT < 0.88) {
       ctx.save();
       ctx.globalAlpha = 0.85;
       const r = 22 * scale + 4;
