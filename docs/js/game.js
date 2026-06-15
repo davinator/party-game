@@ -326,9 +326,8 @@ class GO {
       if (elapsed >= VANISH_RESET) { this._triggered = false; this._gone = false; }
     }
     if (this.type === 'elevator') {
-      if (!this._triggered) { this.x=this.baseX; this.y=this.baseY; this._vx=0; this._vy=0; return; }
       const CYCLE = ELEV_RISE*2 + ELEV_WAIT*2;
-      const e = (t - this._triggerT) % CYCLE;
+      const e = t % CYCLE;
       let frac;
       if      (e < ELEV_RISE)               frac = e / ELEV_RISE;
       else if (e < ELEV_RISE + ELEV_WAIT)   frac = 1;
@@ -363,7 +362,7 @@ class GO {
       case 'shock_platform': return this.shocked   ? 'shocked'  : 'idle';
       case 'flip_platform':  return this._flipped ? 'flipped' : this._flipWarning ? 'warning' : 'idle';
       case 'disappearing':   return this._gone     ? 'gone'     : this._triggered ? 'warning' : 'idle';
-      case 'elevator':       return this._triggered ? 'moving'  : 'idle';
+      case 'elevator':       return 'moving';
       case 'conveyor':       return this.rotation===180 ? 'roll_rev' : 'roll';
       case 'black_hole':     return 'spin';
       default:               return 'idle';
@@ -602,13 +601,13 @@ class Player {
   }
 
   updateLocal(inp, level, placementActive=false, mirrorControls=true) {
-    if (this.state==='finished') return null;
-
     // Blue team's screen is horizontally mirrored — invert left/right (skip in waiting room)
     const isBlue = this.team === 'blue';
     const mirror = isBlue && mirrorControls;
-    const goLeft  = mirror ? inp.right : inp.left;
-    const goRight = mirror ? inp.left  : inp.right;
+    // Finished players: physics keeps running (gravity/landing) but controls are disabled
+    const controlsEnabled = this.state !== 'finished';
+    const goLeft  = controlsEnabled && (mirror ? inp.right : inp.left);
+    const goRight = controlsEnabled && (mirror ? inp.left  : inp.right);
 
     const { solids, hazards, springs, endZone, startZone, blackHoles } = level;
 
@@ -685,6 +684,9 @@ class Player {
       }
       if (dist < BH_KILL_RADIUS) return 'died';
     }
+
+    // Finished players have already landed their run — skip all die/finish checks
+    if (this.state === 'finished') return null;
 
     // Death / finish
     for (const hz of hazards) {
@@ -1174,6 +1176,13 @@ class Game {
         if (this.isHost && this.phase==='gameover') this._returnToWaiting();
       });
 
+    document.getElementById('force-end-btn')
+      .addEventListener('click', ()=>{
+        if (!this.isHost || this.phase!=='play') return;
+        this._applyPhase('results', RESULTS_TIME);
+        this.net.broadcast({ type:'phase_change', newPhase:'results', timer:RESULTS_TIME });
+      });
+
     this.canvas.addEventListener('mousemove', e=>{
       if (!this.placement.active) return;
       const w=this.screenToWorld(e.clientX, e.clientY);
@@ -1222,8 +1231,8 @@ class Game {
         counter.textContent=`${lp.placementsLeft} left`;
         counter.className=lp.placementsLeft>0 ? 'has-placements' : 'no-placements';
       } else {
-        counter.textContent='∞ placements';
-        counter.className='has-placements';
+        counter.textContent=lp.placementsLeft>0 ? `${lp.placementsLeft} left` : 'no placements';
+        counter.className=lp.placementsLeft>0 ? 'has-placements' : 'no-placements';
       }
     }
   }
@@ -1242,8 +1251,8 @@ class Game {
     const label={build:`BUILD · ${rt}`,countdown:'GET READY',play:`RACE · ${rt}`,results:`RESULTS · ${rt}`,gameover:'GAME OVER'}[this.phase]||'';
     document.getElementById('hud-phase-label').textContent=label;
     const timerEl=document.getElementById('hud-timer');
-    timerEl.textContent=secs+'s';
-    timerEl.className=(secs<=10&&this.phase!=='results')?'urgent':'';
+    timerEl.textContent = this.phase==='play' ? '' : secs+'s';
+    timerEl.className = (secs<=10 && this.phase!=='results' && this.phase!=='play') ? 'urgent' : '';
     document.getElementById('score-green').textContent=this.scores.green;
     document.getElementById('score-blue').textContent=this.scores.blue;
   }
@@ -1277,7 +1286,7 @@ class Game {
                    : (fin.length ? 'Finished: '+fin.map(p=>p.name).join(', ') : 'Nobody finished!');
       const btn=document.getElementById('next-round-btn');
       const waiting=document.getElementById('results-waiting');
-      btn.textContent = isGameOver ? '↩ Return to Lobby' : '▶ Next Round';
+      btn.textContent = isGameOver ? '↩ Go back to waiting room' : '▶ Next Round';
       btn.style.display=this.isHost?'':'none';
       waiting.style.display=this.isHost?'none':'';
       waiting.textContent = isGameOver ? 'Waiting for host to return to lobby…' : 'Waiting for host to start next round…';
@@ -1296,6 +1305,28 @@ class Game {
     } else {
       el.classList.add('hidden');
     }
+  }
+
+  _updateFinishModal() {
+    const el = document.getElementById('finish-modal');
+    if (!el) return;
+    const lp = this.localPlayer;
+    const show = this.phase === 'play' && lp?.state === 'finished';
+    el.classList.toggle('hidden', !show);
+    if (show) {
+      const waiting = Object.values(this.players).filter(p => p.state === 'alive');
+      document.getElementById('finish-subtitle').textContent =
+        waiting.length ? `Waiting for ${waiting.length} more player${waiting.length>1?'s':''}…` : 'Everyone is done!';
+    }
+  }
+
+  _updateForceEndBtn() {
+    const el = document.getElementById('host-force-end');
+    if (!el) return;
+    const lp = this.localPlayer;
+    const show = this.phase === 'play' && this.isHost &&
+                 (lp?.state === 'dead' || lp?.state === 'finished');
+    el.classList.toggle('hidden', !show);
   }
 
   _resize() {
@@ -1608,6 +1639,9 @@ class Game {
     const ov = document.getElementById('overlay');
     ov.style.display = ''; // restore if hidden by _enterGame
     ov.classList.add('compact');
+    document.getElementById('results-panel')?.classList.add('hidden');
+    document.getElementById('finish-modal')?.classList.add('hidden');
+    document.getElementById('host-force-end')?.classList.add('hidden');
     this._refreshWaitingPanel();
     if (!this._loopStarted) {
       this._loopStarted = true;
@@ -1716,15 +1750,12 @@ class Game {
       } else if (this.phase==='countdown') {
         this._applyPhase('play', PLAY_TIME);
         this.net.broadcast({ type:'phase_change', newPhase:'play', timer:PLAY_TIME });
-      } else if (this.phase==='play') {
-        this._applyPhase('results', RESULTS_TIME);
-        this.net.broadcast({ type:'phase_change', newPhase:'results', timer:RESULTS_TIME });
       }
     }
 
-    if (this.phase==='countdown') { this._updateHUD(); this._updateResultsPanel(); return; }
-    if (this.phase==='results')   { this._updateHUD(); this._updateResultsPanel(); return; }
-    if (this.phase==='gameover')  { this._updateHUD(); this._updateResultsPanel(); return; }
+    if (this.phase==='countdown') { this._updateHUD(); this._updateResultsPanel(); this._updateFinishModal(); this._updateForceEndBtn(); return; }
+    if (this.phase==='results')   { this._updateHUD(); this._updateResultsPanel(); this._updateFinishModal(); this._updateForceEndBtn(); return; }
+    if (this.phase==='gameover')  { this._updateHUD(); this._updateResultsPanel(); this._updateFinishModal(); this._updateForceEndBtn(); return; }
 
     const lp=this.localPlayer;
     if (lp) {
@@ -1734,7 +1765,7 @@ class Game {
 
       // Trigger disappearing platform on first contact
       const ridingNow = lp._riding;
-      if (ridingNow && (ridingNow.type==='disappearing'||ridingNow.type==='elevator') && !ridingNow._triggered) {
+      if (ridingNow && ridingNow.type==='disappearing' && !ridingNow._triggered) {
         ridingNow._triggered = true; ridingNow._triggerT = this._phaseTime;
         this.net.broadcast({ type:'platform_trigger', id:ridingNow.id, t:this._phaseTime });
       }
@@ -1791,6 +1822,8 @@ class Game {
     this._updateHUD();
     this._updateBuildPanel();
     this._updateResultsPanel();
+    this._updateFinishModal();
+    this._updateForceEndBtn();
     if (this._sendTick%6===0) this._updatePlayerDots();
   }
 

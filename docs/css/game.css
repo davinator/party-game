@@ -8,14 +8,14 @@
 #game-hud {
   position: fixed;
   top: 0; left: 0; right: 0;
-  height: 48px;
+  height: 60px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 0 24px;
-  background: rgba(0,0,0,0.80);
+  background: rgba(0,0,0,0.85);
   backdrop-filter: blur(4px);
-  border-bottom: 1px solid rgba(255,255,255,0.07);
+  border-bottom: 1px solid rgba(255,255,255,0.10);
   z-index: 60;
   font-family: 'Courier New', monospace;
   pointer-events: none;
@@ -23,30 +23,32 @@
 }
 
 .hud-team {
-  font-size: 0.88rem;
+  font-size: 0.95rem;
   font-weight: bold;
   min-width: 160px;
 }
 .hud-team-green { color: #2ecc71; }
 .hud-team-blue { color: #74b9ff; text-align: right; }
 
-.hud-score { font-size: 1.1rem; }
+.hud-score { font-size: 1.2rem; }
 
 #hud-center { text-align: center; flex: 1; }
 
 #hud-phase-label {
   display: block;
-  font-size: 0.65rem;
-  letter-spacing: 2px;
-  color: #888;
+  font-size: 1.05rem;
+  font-weight: bold;
+  letter-spacing: 3px;
+  color: #fff;
   text-transform: uppercase;
+  text-shadow: 0 0 12px rgba(241,196,15,0.5);
 }
 
 #hud-timer {
   display: block;
-  font-size: 1.4rem;
+  font-size: 1.1rem;
   font-weight: bold;
-  color: #fff;
+  color: #ccc;
   line-height: 1.1;
 }
 #hud-timer.urgent { color: #e74c3c; }
@@ -54,11 +56,11 @@
 /* ── PLAYER DOTS BAR ── */
 #hud-players {
   position: fixed;
-  top: 48px; left: 0; right: 0;
+  top: 60px; left: 0; right: 0;
   display: flex;
   gap: 4px;
-  padding: 4px 16px;
-  background: rgba(0,0,0,0.55);
+  padding: 5px 16px;
+  background: rgba(0,0,0,0.60);
   z-index: 59;
   pointer-events: none;
   flex-wrap: wrap;
@@ -69,15 +71,16 @@
   align-items: center;
   gap: 5px;
   font-family: 'Courier New', monospace;
-  font-size: 0.68rem;
-  padding: 2px 8px;
+  font-size: 0.78rem;
+  padding: 3px 9px;
   border-radius: 3px;
-  background: rgba(255,255,255,0.05);
+  background: rgba(255,255,255,0.07);
   border-left: 3px solid transparent;
+  color: #ddd;
 }
 
 .hud-player .state-dot {
-  width: 7px; height: 7px; border-radius: 50%;
+  width: 8px; height: 8px; border-radius: 50%;
 }
 .hud-player.s-alive    .state-dot { background: #2ecc71; }
 .hud-player.s-dead     .state-dot { background: #e74c3c; }
@@ -115,9 +118,9 @@
   background: rgba(255,255,255,0.06);
   border: 1px solid rgba(255,255,255,0.12);
   border-radius: 6px;
-  color: #bbb;
+  color: #ccc;
   font-family: 'Courier New', monospace;
-  font-size: 0.72rem;
+  font-size: 0.78rem;
   cursor: pointer;
   transition: background 0.12s, border-color 0.12s, color 0.12s;
   white-space: nowrap;
@@ -145,20 +148,20 @@
   background: rgba(255,255,255,0.07);
   border: 1px solid rgba(255,255,255,0.18);
   border-radius: 6px;
-  color: #ccc;
+  color: #ddd;
   font-family: 'Courier New', monospace;
-  font-size: 0.75rem;
+  font-size: 0.8rem;
   cursor: pointer;
   pointer-events: all;
   transition: background 0.12s, color 0.12s;
 }
 #rotate-btn:hover { background: rgba(255,255,255,0.14); color: #fff; }
 
-#placements-counter { font-size: 0.75rem; }
+#placements-counter { font-size: 0.82rem; }
 #placements-counter.has-placements { color: #2ecc71; }
 #placements-counter.no-placements  { color: #e74c3c; }
 
-#build-hint { font-size: 0.65rem; color: #555; }
+#build-hint { font-size: 0.78rem; color: #999; }
 
 /* ── RESULTS PANEL ── */
 #results-panel {
@@ -167,13 +170,13 @@
   transform: translate(-50%, -50%);
   z-index: 70;
   background: rgba(8,8,22,0.96);
-  border: 2px solid rgba(241,196,15,0.45);
+  border: 2px solid rgba(241,196,15,0.55);
   border-radius: 14px;
   padding: 32px 48px 28px;
   font-family: 'Courier New', monospace;
   text-align: center;
   color: #fff;
-  min-width: 320px;
+  min-width: 340px;
 }
 
 #results-title {
@@ -193,8 +196,8 @@
 #results-scores .res-blue { color: #74b9ff; font-weight: bold; }
 
 #results-finished {
-  font-size: 0.76rem;
-  color: #777;
+  font-size: 0.88rem;
+  color: #bbb;
   margin-bottom: 22px;
   min-height: 18px;
 }
@@ -208,7 +211,7 @@
   border-radius: 6px;
   color: #000;
   font-family: 'Courier New', monospace;
-  font-size: 0.88rem;
+  font-size: 0.92rem;
   font-weight: bold;
   letter-spacing: 1px;
   cursor: pointer;
@@ -217,8 +220,8 @@
 #next-round-btn:hover { opacity: 0.85; }
 
 #results-waiting {
-  font-size: 0.75rem;
-  color: #555;
+  font-size: 0.85rem;
+  color: #aaa;
   margin-top: 14px;
 }
 

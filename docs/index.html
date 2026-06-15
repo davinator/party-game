@@ -208,6 +208,40 @@
       letter-spacing: 1px;
     }
 
+    #finish-modal {
+      position: fixed;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      background: rgba(10,10,26,0.92);
+      border: 2px solid #f1c40f;
+      border-radius: 8px;
+      padding: 28px 40px;
+      text-align: center;
+      z-index: 50;
+      pointer-events: none;
+    }
+    #finish-title { font-size: 1.6rem; color: #f1c40f; letter-spacing: 2px; }
+    #finish-subtitle { color: #aaa; font-size: 0.85rem; margin-top: 8px; }
+
+    #host-force-end {
+      position: fixed;
+      bottom: 24px; left: 50%;
+      transform: translateX(-50%);
+      z-index: 50;
+    }
+    #force-end-btn {
+      background: #e74c3c;
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      padding: 10px 20px;
+      font-family: 'Courier New', monospace;
+      font-size: 0.85rem;
+      cursor: pointer;
+      letter-spacing: 1px;
+    }
+    #force-end-btn:hover { opacity: 0.85; }
+
     #reconnect-banner {
       position: fixed;
       top: 0; left: 0; right: 0;
@@ -302,6 +336,17 @@
   <div id="results-finished"></div>
   <button id="next-round-btn">▶ Next Round</button>
   <p id="results-waiting"></p>
+</div>
+
+<!-- ── FINISH MODAL ── -->
+<div id="finish-modal" class="hidden">
+  <div id="finish-title">YOU FINISHED!</div>
+  <p id="finish-subtitle">Waiting for others…</p>
+</div>
+
+<!-- ── HOST FORCE-END ── -->
+<div id="host-force-end" class="hidden">
+  <button id="force-end-btn">⏭ End Round Now</button>
 </div>
 
 <script src="js/game.js"></script>
