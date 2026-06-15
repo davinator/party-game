@@ -389,7 +389,9 @@ class GO {
   _drawAt(ctx, x, y, w, h) {
     // Range track drawn before sprite so it sits behind the platform body
     if (this.type === 'moving_platform') this._dMovingPlatTrack(ctx, w, h);
-    if (sprites.draw(ctx, this.type, this._spriteAnim(), x, y, w, h)) return;
+    // Types with custom animated draw code bypass the sprite system
+    const CUSTOM_DRAW = new Set(['cannon','black_hole','shock_platform','flip_platform','disappearing','spring','conveyor','start_zone','end_zone']);
+    if (!CUSTOM_DRAW.has(this.type) && sprites.draw(ctx, this.type, this._spriteAnim(), x, y, w, h)) return;
     switch(this.type) {
       case 'platform':        this._dPlat(ctx,x,y,w,h);         break;
       case 'moving_platform': this._dMovingPlat(ctx,x,y,w,h);   break;
