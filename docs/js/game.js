@@ -166,18 +166,18 @@ const SPRITE_MANIFEST = {
   player_blue:      { src:'sprites/player_blue.png',      fw:26,   fh:40,  anims:{ idle:{row:0,frames:1,fps:1}, walk:{row:1,frames:4,fps:10}, jump:{row:2,frames:1,fps:1}, fall:{row:3,frames:1,fps:1}, ghost:{row:4,frames:4,fps:6}, finished:{row:5,frames:4,fps:6} } },
   platform:         { src:'sprites/platform_tile.svg',   fw:128, fh:30, tile:true, anims:{ idle:{row:0,frames:1,fps:1} } },
   moving_platform:  { src:'sprites/moving_platform.svg', fw:128, fh:30, tile:true, anims:{ idle:{row:0,frames:1,fps:1} } },
-  conveyor:         { src:'sprites/conveyor.svg',        fw:128, fh:30, tile:true, anims:{ roll:{row:0,frames:1,fps:1}, roll_rev:{row:0,frames:1,fps:1} } },
+  conveyor:         { fw:128, fh:30, tile:true, anims:{ roll:{ src:'sprites/conveyor.svg',     row:0,frames:1,fps:1 }, roll_rev:{ src:'sprites/conveyor_rev.svg', row:0,frames:1,fps:1 } } },
   ice:              { src:'sprites/ice.svg',             fw:128, fh:30, tile:true, anims:{ idle:{row:0,frames:1,fps:1} } },
-  shock_platform:   { src:'sprites/shock_platform.svg',  fw:128, fh:30, tile:true, anims:{ idle:{row:0,frames:1,fps:1}, shocked:{row:0,frames:1,fps:1} } },
-  disappearing:     { src:'sprites/disappearing.svg',    fw:128, fh:30, tile:true, anims:{ idle:{row:0,frames:1,fps:1}, gone:{row:0,frames:1,fps:1} } },
-  flip_platform:    { src:'sprites/flip_platform.svg',   fw:128, fh:30, tile:true, anims:{ idle:{row:0,frames:1,fps:1}, flipped:{row:0,frames:1,fps:1} } },
+  shock_platform:   { fw:128, fh:30, tile:true, anims:{ idle:{ src:'sprites/shock_idle.svg',   row:0,frames:1,fps:1 }, shocked:{ src:'sprites/shock_on.svg',   row:0,frames:1,fps:1 } } },
+  disappearing:     { src:'sprites/disappearing.svg', fw:128, fh:30, tile:true, anims:{ idle:{row:0,frames:1,fps:1} } },
+  flip_platform:    { fw:128, fh:30, tile:true, anims:{ idle:{ src:'sprites/flip_safe.svg',    row:0,frames:1,fps:1 }, flipped:{ src:'sprites/flip_spikes.svg', row:0,frames:1,fps:1 }, warning:{ src:'sprites/flip_safe.svg', row:0,frames:1,fps:1 } } },
   elevator:         { src:'sprites/elevator.svg',        fw:80,  fh:30, anims:{ idle:{row:0,frames:1,fps:1}, moving:{row:0,frames:1,fps:1} } },
   spike:            { src:'sprites/spike.svg',           fw:32,  fh:28, anims:{ idle:{row:0,frames:1,fps:1} } },
-  spring:           { src:'sprites/spring.svg',          fw:48,  fh:20, anims:{ idle:{row:0,frames:1,fps:1} } },
-  cannon:           { src:'sprites/cannon.svg',          fw:32,  fh:32, anims:{ idle:{row:0,frames:1,fps:1} } },
-  black_hole:       { src:'sprites/black_hole.svg',      fw:40,  fh:40, anims:{ spin:{row:0,frames:1,fps:1} } },
-  start_zone:       { src:'sprites/start_zone.svg',      fw:190, fh:30, anims:{ idle:{row:0,frames:1,fps:1} } },
-  end_zone:         { src:'sprites/end_zone.svg',        fw:190, fh:30, anims:{ idle:{row:0,frames:1,fps:1} } },
+  spring:           { fw:48,  fh:20, anims:{ idle:{ src:'sprites/spring_extended.svg', row:0,frames:1,fps:1 }, compressed:{ src:'sprites/spring_compressed.svg', row:0,frames:1,fps:1 } } },
+  cannon:           { src:'sprites/cannon.svg',     fw:32,  fh:32, anims:{ idle:{row:0,frames:1,fps:1} } },
+  black_hole:       { src:'sprites/black_hole.svg', fw:40,  fh:40, anims:{ spin:{row:0,frames:1,fps:1} } },
+  start_zone:       { src:'sprites/start_zone.svg', fw:190, fh:30, anims:{ idle:{row:0,frames:1,fps:1} } },
+  end_zone:         { src:'sprites/end_zone.svg',   fw:190, fh:30, anims:{ idle:{row:0,frames:1,fps:1} } },
 };
 
 class SpriteLoader {
@@ -186,25 +186,36 @@ class SpriteLoader {
   load(manifest) {
     this._defs = manifest;
     for (const [name, def] of Object.entries(manifest)) {
-      if (!def.src) continue;
-      const img = new Image();
-      img.onload = () => { this._imgs[name] = img; };
-      img.src = def.src;
+      if (def.src) {
+        const img = new Image();
+        img.onload = () => { this._imgs[name] = img; };
+        img.src = def.src;
+      }
+      for (const [animName, anim] of Object.entries(def.anims ?? {})) {
+        if (anim.src) {
+          const key = `${name}::${animName}`;
+          const img = new Image();
+          img.onload = () => { this._imgs[key] = img; };
+          img.src = anim.src;
+        }
+      }
     }
   }
 
   // Returns true if drawn; false = caller renders its own fallback
   draw(ctx, name, anim, x, y, w, h, flipX = false) {
-    const img = this._imgs[name];
     const def = this._defs[name];
-    if (!img || !def) return false;
+    if (!def) return false;
     const a = def.anims?.[anim] ?? def.anims?.idle;
     if (!a) return false;
+    const imgKey = a.src ? `${name}::${anim}` : name;
+    // Also try idle fallback key for per-anim-src defs
+    const img = this._imgs[imgKey] ?? (a.src ? null : this._imgs[name]);
+    if (!img || !img.complete || img.naturalWidth === 0) return false;
     const frame = a.frames > 1
       ? Math.floor(performance.now() / 1000 * a.fps) % a.frames
       : 0;
     const sx = frame * def.fw, sy = (a.row ?? 0) * def.fh;
-    // Tiled sprites: repeat the tile across the full width
     if (def.tile) {
       const tw = def.fw;
       for (let tx = x; tx < x + w; tx += tw) {
@@ -382,6 +393,7 @@ class GO {
       case 'elevator':       return 'moving';
       case 'conveyor':       return this.rotation===180 ? 'roll_rev' : 'roll';
       case 'black_hole':     return 'spin';
+      case 'spring':         return this._compressed ? 'compressed' : 'idle';
       default:               return 'idle';
     }
   }
@@ -390,7 +402,7 @@ class GO {
     // Range track drawn before sprite so it sits behind the platform body
     if (this.type === 'moving_platform') this._dMovingPlatTrack(ctx, w, h);
     // Types with custom animated draw code bypass the sprite system
-    const CUSTOM_DRAW = new Set(['cannon','black_hole','shock_platform','flip_platform','disappearing','spring','conveyor','start_zone','end_zone']);
+    const CUSTOM_DRAW = new Set(['cannon','shock_platform','disappearing','flip_platform']);
     if (!CUSTOM_DRAW.has(this.type) && sprites.draw(ctx, this.type, this._spriteAnim(), x, y, w, h)) return;
     switch(this.type) {
       case 'platform':        this._dPlat(ctx,x,y,w,h);         break;
@@ -522,10 +534,8 @@ class GO {
   }
 
   _dShock(ctx, x, y, w, h) {
-    ctx.fillStyle = this.shocked ? '#fff176' : '#546e7a';
-    ctx.fillRect(x, y, w, h);
+    sprites.draw(ctx, 'shock_platform', this.shocked ? 'shocked' : 'idle', x, y, w, h);
     if (this.shocked) {
-      ctx.fillStyle = '#ffee58'; ctx.fillRect(x, y, w, 3);
       const frame = Math.floor(performance.now() / 70);
       for (let i = 0; i < 4; i++) {
         const seed = frame * 19 + i * 41;
@@ -540,7 +550,6 @@ class GO {
         ctx.stroke();
       }
     }
-    this._label(ctx, x, y, w, h, 'ZAP');
   }
 
   _dElevator(ctx, x, y, w, h) {
@@ -549,37 +558,21 @@ class GO {
   }
 
   _dFlip(ctx, x, y, w, h) {
-    const angle = this._flipAngle || 0;
-    const cx = x + w/2, cy = y + h/2;
     if (this._flipped) {
-      const barH = Math.round(h * 0.4);
-      ctx.fillStyle = '#c0392b'; ctx.fillRect(x, cy - barH/2, w, barH);
-      ctx.fillStyle = '#e74c3c';
-      const sz = 6, step = sz*2+2;
-      const count = Math.floor((w - sz) / step);
-      const ox = x + (w - count*step)/2 + sz;
-      for (let i = 0; i < count; i++) {
-        const sx2 = ox + i * step;
-        ctx.beginPath(); ctx.moveTo(sx2-sz, cy-barH/2); ctx.lineTo(sx2+sz, cy-barH/2); ctx.lineTo(sx2, cy-barH/2-sz*1.7); ctx.fill();
-        ctx.beginPath(); ctx.moveTo(sx2-sz, cy+barH/2); ctx.lineTo(sx2+sz, cy+barH/2); ctx.lineTo(sx2, cy+barH/2+sz*1.7); ctx.fill();
-      }
-      ctx.beginPath(); ctx.moveTo(x, cy-barH*0.4); ctx.lineTo(x, cy+barH*0.4); ctx.lineTo(x-sz*1.5, cy); ctx.fill();
-      ctx.beginPath(); ctx.moveTo(x+w, cy-barH*0.4); ctx.lineTo(x+w, cy+barH*0.4); ctx.lineTo(x+w+sz*1.5, cy); ctx.fill();
+      sprites.draw(ctx, 'flip_platform', 'flipped', x, y, w, h);
     } else {
+      const angle = this._flipAngle || 0;
       const scaleY = Math.cos(angle);
-      const dh = Math.max(3, Math.abs(scaleY) * h);
+      const dh = Math.max(2, Math.abs(scaleY) * h);
       const dy = (h - dh) / 2;
-      ctx.fillStyle = this._flipWarning ? '#e74c3c' : '#8e44ad';
-      ctx.fillRect(x, y + dy, w, dh);
-      this._label(ctx, x, y + dy, w, dh, this._flipWarning ? 'FLIP!' : 'FLIP');
+      sprites.draw(ctx, 'flip_platform', 'idle', x, y + dy, w, dh);
     }
   }
 
   _dDisappearing(ctx, x, y, w, h) {
     const sx = this._shakeX || 0;
     ctx.globalAlpha = this._triggered ? 0.4 : 1;
-    ctx.fillStyle = '#a29bfe'; ctx.fillRect(x + sx, y, w, h);
-    this._label(ctx, x + sx, y, w, h, 'VANISH');
+    sprites.draw(ctx, 'disappearing', 'idle', x + sx, y, w, h);
     ctx.globalAlpha = 1;
   }
 
@@ -590,17 +583,7 @@ class GO {
   }
 
   _dCannon(ctx, x, y, w, h) {
-    // Body
-    ctx.fillStyle = '#2c3e50';
-    ctx.fillRect(x+2, y+5, Math.round(w*0.62), h-10);
-    // Barrel extends right
-    ctx.fillStyle = '#1a252f';
-    ctx.fillRect(x + Math.round(w*0.48), y + Math.round(h*0.36), Math.round(w*0.52), Math.round(h*0.28));
-    // Wheels
-    ctx.fillStyle = '#34495e';
-    ctx.beginPath(); ctx.arc(x+7, y+h-6, 5, 0, Math.PI*2); ctx.fill();
-    ctx.beginPath(); ctx.arc(x+18, y+h-6, 5, 0, Math.PI*2); ctx.fill();
-    // Muzzle flash when just fired
+    sprites.draw(ctx, 'cannon', 'idle', x, y, w, h);
     if (this._firePhase != null && this._firePhase < 0.18) {
       const ft = 1 - this._firePhase / 0.18;
       const mx = x + w, my = y + h/2;

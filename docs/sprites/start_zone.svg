@@ -1,16 +1,4 @@
 <svg xmlns="http://www.w3.org/2000/svg"
-     viewBox="0 0 190 30" width="190" height="30">
-  <defs>
-    <linearGradient id="sg" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%"   stop-color="#48c868"/>
-      <stop offset="100%" stop-color="#28a048"/>
-    </linearGradient>
-  </defs>
-  <rect x="0" y="0" width="190" height="30" fill="#1a7830"/>
-  <rect x="2" y="2" width="186" height="26" fill="url(#sg)"/>
-  <line x1="2" y1="3" x2="188" y2="3"
-        stroke="rgba(255,255,255,0.40)" stroke-width="1"/>
-  <polyline points="18,9 28,15 18,21" fill="none" stroke="rgba(255,255,255,0.70)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/><polyline points="40,9 50,15 40,21" fill="none" stroke="rgba(255,255,255,0.70)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/><polyline points="62,9 72,15 62,21" fill="none" stroke="rgba(255,255,255,0.70)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/><polyline points="84,9 94,15 84,21" fill="none" stroke="rgba(255,255,255,0.70)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/><polyline points="106,9 116,15 106,21" fill="none" stroke="rgba(255,255,255,0.70)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/><polyline points="128,9 138,15 128,21" fill="none" stroke="rgba(255,255,255,0.70)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/><polyline points="150,9 160,15 150,21" fill="none" stroke="rgba(255,255,255,0.70)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/><polyline points="172,9 182,15 172,21" fill="none" stroke="rgba(255,255,255,0.70)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
-  <rect x="1" y="1" width="188" height="28"
-        fill="none" stroke="#1a7830" stroke-width="2"/>
+     viewBox="0 0 190 30" width="190" height="30" opacity="0.55">
+  <rect x="0" y="0" width="15" height="15" fill="#2ecc71"/><rect x="15" y="0" width="15" height="15" fill="#3498db"/><rect x="30" y="0" width="15" height="15" fill="#2ecc71"/><rect x="45" y="0" width="15" height="15" fill="#3498db"/><rect x="60" y="0" width="15" height="15" fill="#2ecc71"/><rect x="75" y="0" width="15" height="15" fill="#3498db"/><rect x="90" y="0" width="15" height="15" fill="#2ecc71"/><rect x="105" y="0" width="15" height="15" fill="#3498db"/><rect x="120" y="0" width="15" height="15" fill="#2ecc71"/><rect x="135" y="0" width="15" height="15" fill="#3498db"/><rect x="150" y="0" width="15" height="15" fill="#2ecc71"/><rect x="165" y="0" width="15" height="15" fill="#3498db"/><rect x="180" y="0" width="10" height="15" fill="#2ecc71"/><rect x="0" y="15" width="15" height="15" fill="#3498db"/><rect x="15" y="15" width="15" height="15" fill="#2ecc71"/><rect x="30" y="15" width="15" height="15" fill="#3498db"/><rect x="45" y="15" width="15" height="15" fill="#2ecc71"/><rect x="60" y="15" width="15" height="15" fill="#3498db"/><rect x="75" y="15" width="15" height="15" fill="#2ecc71"/><rect x="90" y="15" width="15" height="15" fill="#3498db"/><rect x="105" y="15" width="15" height="15" fill="#2ecc71"/><rect x="120" y="15" width="15" height="15" fill="#3498db"/><rect x="135" y="15" width="15" height="15" fill="#2ecc71"/><rect x="150" y="15" width="15" height="15" fill="#3498db"/><rect x="165" y="15" width="15" height="15" fill="#2ecc71"/><rect x="180" y="15" width="10" height="15" fill="#3498db"/>
 </svg>

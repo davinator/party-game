@@ -163,10 +163,10 @@ def gen_conveyor():
     BELT  = '#383838'
     RIDGE = 'rgba(255,255,255,0.13)'
 
-    # Diagonal ridges at 30° angle, spaced 10px
+    # Diagonal ridges at 30° angle, spaced 10px (will be animated)
     ridges = []
     spacing = 10
-    for ox in range(-H, W + H, spacing):
+    for ox in range(-H, W + H + spacing, spacing):
         x1 = ox;     y1 = B + 1
         x2 = ox + H; y2 = H - B - 1
         ridges.append(
@@ -174,7 +174,7 @@ def gen_conveyor():
             f' stroke="{RIDGE}" stroke-width="2"/>'
         )
 
-    # Yellow direction arrow strip at top
+    # Yellow direction arrows pointing RIGHT
     arrows = ''.join(
         f'<polyline points="{x},{5} {x+6},{7.5} {x},{10}"'
         f' fill="none" stroke="rgba(255,200,0,0.55)" stroke-width="1.5"'
@@ -184,6 +184,11 @@ def gen_conveyor():
 
     return f'''<svg xmlns="http://www.w3.org/2000/svg"
      viewBox="0 0 {W} {H}" width="{W}" height="{H}" preserveAspectRatio="none">
+  <style>
+    @keyframes roll{{from{{transform:translateX(0)}}to{{transform:translateX(18px)}}}}
+    .ridges{{animation:roll 0.4s linear infinite;}}
+    .arrows{{animation:roll 0.4s linear infinite;}}
+  </style>
   <defs>
     <linearGradient id="belt" x1="0" y1="0" x2="0" y2="1">
       <stop offset="0%"   stop-color="#484848"/>
@@ -193,8 +198,65 @@ def gen_conveyor():
   </defs>
   <rect x="0" y="0" width="{W}" height="{H}" fill="#1e1e1e"/>
   <rect x="{B}" y="{B}" width="{W-2*B}" height="{H-2*B}" fill="url(#belt)"/>
-  <g clip-path="url(#bc)">
+  <g class="ridges" clip-path="url(#bc)">
     {''.join(ridges)}
+  </g>
+  <g class="arrows" clip-path="url(#bc)">
+    {arrows}
+  </g>
+  <line x1="{B}" y1="{B+1}" x2="{W-B}" y2="{B+1}"
+        stroke="rgba(255,255,255,0.18)" stroke-width="1"/>
+  <rect x="1" y="1" width="{W-2}" height="{H-2}"
+        fill="none" stroke="#1e1e1e" stroke-width="2"/>
+</svg>'''
+
+
+# ── 3b. CONVEYOR REVERSE ──────────────────────────────────────────────────────
+def gen_conveyor_rev():
+    W, H = 128, 30
+    B = 2
+    BELT  = '#383838'
+    RIDGE = 'rgba(255,255,255,0.13)'
+
+    # Diagonal ridges (same visual, different animation direction)
+    ridges = []
+    spacing = 10
+    for ox in range(-H, W + H + spacing, spacing):
+        x1 = ox;     y1 = B + 1
+        x2 = ox + H; y2 = H - B - 1
+        ridges.append(
+            f'<line x1="{x1:.1f}" y1="{y1}" x2="{x2:.1f}" y2="{y2}"'
+            f' stroke="{RIDGE}" stroke-width="2"/>'
+        )
+
+    # Yellow direction arrows pointing LEFT
+    arrows = ''.join(
+        f'<polyline points="{x+6},{5} {x},{7.5} {x+6},{10}"'
+        f' fill="none" stroke="rgba(255,200,0,0.55)" stroke-width="1.5"'
+        f' stroke-linejoin="round"/>'
+        for x in range(16, W - 10, 20)
+    )
+
+    return f'''<svg xmlns="http://www.w3.org/2000/svg"
+     viewBox="0 0 {W} {H}" width="{W}" height="{H}" preserveAspectRatio="none">
+  <style>
+    @keyframes roll-rev{{from{{transform:translateX(0)}}to{{transform:translateX(-18px)}}}}
+    .ridges-rev{{animation:roll-rev 0.4s linear infinite;}}
+    .arrows-rev{{animation:roll-rev 0.4s linear infinite;}}
+  </style>
+  <defs>
+    <linearGradient id="belt" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%"   stop-color="#484848"/>
+      <stop offset="100%" stop-color="#282828"/>
+    </linearGradient>
+    <clipPath id="bc"><rect x="{B}" y="{B}" width="{W-2*B}" height="{H-2*B}"/></clipPath>
+  </defs>
+  <rect x="0" y="0" width="{W}" height="{H}" fill="#1e1e1e"/>
+  <rect x="{B}" y="{B}" width="{W-2*B}" height="{H-2*B}" fill="url(#belt)"/>
+  <g class="ridges-rev" clip-path="url(#bc)">
+    {''.join(ridges)}
+  </g>
+  <g class="arrows-rev" clip-path="url(#bc)">
     {arrows}
   </g>
   <line x1="{B}" y1="{B+1}" x2="{W-B}" y2="{B+1}"
@@ -250,33 +312,94 @@ def gen_ice():
 </svg>'''
 
 
-# ── 5. SHOCK PLATFORM ─────────────────────────────────────────────────────────
-def gen_shock_platform():
+# ── 5. SHOCK IDLE (gray steel plate) ─────────────────────────────────────────
+def gen_shock_idle():
     W, H = 128, 30
-    # Wood base with a yellow warning band at top + lightning marks
-    warning_band = (
-        f'<rect x="2" y="2" width="{W-4}" height="5"'
-        f' fill="rgba(255,200,0,0.72)"/>'
-        f'<rect x="2" y="2" width="{W-4}" height="1"'
-        f' fill="rgba(255,240,100,0.60)"/>'
+    # Corner bolts
+    bolts = ''.join(
+        f'<circle cx="{cx}" cy="{cy}" r="2.5" fill="#4a5060" stroke="#2a3038" stroke-width="1"/>'
+        for cx, cy in [(8, 8), (120, 8), (8, 22), (120, 22)]
     )
-    # Lightning bolt symbols in the middle plank
+    # Subtle grid lines
+    grid_v = ''.join(
+        f'<line x1="{x}" y1="2" x2="{x}" y2="{H-2}" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>'
+        for x in [32, 64, 96]
+    )
+    grid_h = ''.join(
+        f'<line x1="2" y1="{y}" x2="{W-2}" y2="{y}" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>'
+        for y in [12, 20]
+    )
+    # Hazard diagonal stripes at very top (4px tall)
+    hazard_stripes = (
+        f'<clipPath id="hcl"><rect x="2" y="2" width="{W-4}" height="4"/></clipPath>'
+        f'<g clip-path="url(#hcl)">'
+    )
+    for ox in range(-4, W + 4, 8):
+        hazard_stripes += f'<line x1="{ox}" y1="2" x2="{ox+4}" y2="6" stroke="#1e1e1e" stroke-width="4"/>'
+        hazard_stripes += f'<line x1="{ox+4}" y1="2" x2="{ox+8}" y2="6" stroke="#555" stroke-width="4"/>'
+    hazard_stripes += '</g>'
+
+    return f'''<svg xmlns="http://www.w3.org/2000/svg"
+     viewBox="0 0 {W} {H}" width="{W}" height="{H}" preserveAspectRatio="none">
+  <defs>
+    <linearGradient id="steel" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%"   stop-color="#707888"/>
+      <stop offset="100%" stop-color="#3a4050"/>
+    </linearGradient>
+    {hazard_stripes.split("</g>")[0].split('<g')[0]}
+  </defs>
+  <rect x="0" y="0" width="{W}" height="{H}" fill="#2a3038"/>
+  <rect x="2" y="2" width="{W-4}" height="{H-4}" fill="url(#steel)"/>
+  {grid_v}
+  {grid_h}
+  {''.join(f'<clipPath id="hcl"><rect x="2" y="2" width="{W-4}" height="4"/></clipPath>')}
+  <g clip-path="url(#hcl)">
+    {''.join(f'<rect x="{2+i*8}" y="2" width="4" height="4" fill="#1e1e1e"/><rect x="{2+i*8+4}" y="2" width="4" height="4" fill="#555"/>' for i in range(W//8+1))}
+  </g>
+  <line x1="2" y1="2" x2="{W-2}" y2="2" stroke="rgba(255,255,255,0.20)" stroke-width="1"/>
+  {bolts}
+  <rect x="1" y="1" width="{W-2}" height="{H-2}" fill="none" stroke="#2a3038" stroke-width="2"/>
+</svg>'''
+
+
+# ── 5b. SHOCK ON (yellow electric glowing platform) ───────────────────────────
+def gen_shock_on():
+    W, H = 128, 30
+    # Three lightning bolt polylines
     bolts = ''
     for bx in [28, 64, 100]:
-        # Simple zigzag bolt at center of plank 2 (y≈12..19)
         bolts += (
-            f'<polyline points="{bx+2},{13} {bx-1},{16} {bx+1},{16} {bx-2},{19}"'
-            f' fill="none" stroke="rgba(255,200,0,0.60)" stroke-width="1.5"'
+            f'<polyline points="{bx+2},7 {bx-2},13 {bx+2},13 {bx-2},23"'
+            f' fill="none" stroke="white" stroke-width="2"'
             f' stroke-linejoin="round" stroke-linecap="round"/>'
         )
-    overlay = warning_band + bolts
-    # Use slightly darker/more serious wood
-    planks = [
-        {'y':2,  'h':8, 'top':'#b07848','bot':'#9a6438','grains':[(4.0,0.90,1),(6.5,0.65,2)]},
-        {'y':12, 'h':8, 'top':'#9a6438','bot':'#845428','grains':[(14.0,0.85,2),(16.5,0.60,1)]},
-        {'y':22, 'h':6, 'top':'#845428','bot':'#6e4018','grains':[(24.0,0.70,1)]},
-    ]
-    return wood_tile_svg(W, H, planks, '#6a4018', GRAIN_WARM, overlay=overlay)
+    # Small arc energy bursts along top edge
+    arcs = ''
+    for ax in range(10, W - 10, 15):
+        arcs += (
+            f'<path d="M {ax},4 Q {ax+4},1 {ax+8},4"'
+            f' fill="none" stroke="rgba(255,255,255,0.70)" stroke-width="1.5"/>'
+        )
+
+    return f'''<svg xmlns="http://www.w3.org/2000/svg"
+     viewBox="0 0 {W} {H}" width="{W}" height="{H}" preserveAspectRatio="none">
+  <defs>
+    <linearGradient id="glow" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%"   stop-color="#fff9a0"/>
+      <stop offset="100%" stop-color="#c89400"/>
+    </linearGradient>
+    <filter id="gf" x="-5%" y="-5%" width="110%" height="110%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="1.5"/>
+    </filter>
+  </defs>
+  <rect x="0" y="0" width="{W}" height="{H}" fill="#806000"/>
+  <rect x="2" y="2" width="{W-4}" height="{H-4}" fill="url(#glow)"/>
+  <rect x="2" y="2" width="{W-4}" height="3" fill="rgba(255,255,255,0.50)"/>
+  {arcs}
+  {bolts}
+  <line x1="2" y1="2" x2="{W-2}" y2="2" stroke="rgba(255,255,255,0.70)" stroke-width="1"/>
+  <rect x="1" y="1" width="{W-2}" height="{H-2}" fill="none" stroke="#806000" stroke-width="2"/>
+</svg>'''
 
 
 # ── 6. DISAPPEARING ───────────────────────────────────────────────────────────
@@ -285,16 +408,75 @@ def gen_disappearing():
                          dash='5 3')
 
 
-# ── 7. FLIP PLATFORM ──────────────────────────────────────────────────────────
-def gen_flip_platform():
+# ── 7. FLIP SAFE (purple/violet metallic platform) ────────────────────────────
+def gen_flip_safe():
     W, H = 128, 30
-    # Pivot diamond in the center of the middle plank
-    cx, cy = W // 2, 16
-    pivot = (
-        f'<polygon points="{cx},{cy-4} {cx+5},{cy} {cx},{cy+4} {cx-5},{cy}"'
-        f' fill="rgba(255,220,180,0.55)" stroke="rgba(200,140,80,0.70)" stroke-width="1"/>'
+    # Subtle diagonal cross-hatch lines
+    hatch = ''
+    for ox in range(-H, W + H, 20):
+        hatch += (
+            f'<line x1="{ox}" y1="0" x2="{ox+H}" y2="{H}"'
+            f' stroke="rgba(255,255,255,0.08)" stroke-width="1"/>'
+        )
+    # Corner rivets
+    rivets = ''.join(
+        f'<circle cx="{cx}" cy="{cy}" r="2" fill="#b06dd0" stroke="#4a1a6a" stroke-width="1"/>'
+        for cx, cy in [(6, 6), (122, 6), (6, 24), (122, 24)]
     )
-    return wood_tile_svg(W, H, rust_planks(), BORDER_RUST, GRAIN_RUST, overlay=pivot)
+
+    return f'''<svg xmlns="http://www.w3.org/2000/svg"
+     viewBox="0 0 {W} {H}" width="{W}" height="{H}" preserveAspectRatio="none">
+  <defs>
+    <linearGradient id="flip" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%"   stop-color="#9b59b6"/>
+      <stop offset="100%" stop-color="#6c3483"/>
+    </linearGradient>
+    <clipPath id="fpc"><rect x="2" y="2" width="{W-4}" height="{H-4}"/></clipPath>
+  </defs>
+  <rect x="0" y="0" width="{W}" height="{H}" fill="#4a1a6a"/>
+  <rect x="2" y="2" width="{W-4}" height="{H-4}" fill="url(#flip)"/>
+  <g clip-path="url(#fpc)">
+    {hatch}
+  </g>
+  <line x1="2" y1="3" x2="{W-2}" y2="3" stroke="rgba(255,255,255,0.30)" stroke-width="1"/>
+  {rivets}
+  <rect x="1" y="1" width="{W-2}" height="{H-2}" fill="none" stroke="#4a1a6a" stroke-width="2"/>
+</svg>'''
+
+
+# ── 7b. FLIP SPIKES (red platform with spike teeth top+bottom) ────────────────
+def gen_flip_spikes():
+    W, H = 128, 30
+    # 8 top spikes pointing UP: base at y=10, tip at y=2
+    top_spikes = ''
+    for i, cx in enumerate([8, 24, 40, 56, 72, 88, 104, 120]):
+        top_spikes += (
+            f'<polygon points="{cx-6},10 {cx+6},10 {cx},2"'
+            f' fill="#e74c3c" stroke="#7a1a10" stroke-width="1"/>'
+        )
+    # 8 bottom spikes pointing DOWN: base at y=20, tip at y=28
+    bot_spikes = ''
+    for i, cx in enumerate([8, 24, 40, 56, 72, 88, 104, 120]):
+        bot_spikes += (
+            f'<polygon points="{cx-6},20 {cx+6},20 {cx},28"'
+            f' fill="#e74c3c" stroke="#7a1a10" stroke-width="1"/>'
+        )
+
+    return f'''<svg xmlns="http://www.w3.org/2000/svg"
+     viewBox="0 0 {W} {H}" width="{W}" height="{H}" preserveAspectRatio="none">
+  <defs>
+    <linearGradient id="bar" x1="0" y1="10" x2="0" y2="20" gradientUnits="userSpaceOnUse">
+      <stop offset="0%"   stop-color="#e74c3c"/>
+      <stop offset="100%" stop-color="#c0392b"/>
+    </linearGradient>
+  </defs>
+  <rect x="0" y="0" width="{W}" height="{H}" fill="#7a1a10"/>
+  {top_spikes}
+  {bot_spikes}
+  <rect x="0" y="10" width="{W}" height="10" fill="url(#bar)"/>
+  <line x1="0" y1="11" x2="{W}" y2="11" stroke="rgba(255,255,255,0.20)" stroke-width="1"/>
+  <rect x="0" y="0" width="{W}" height="{H}" fill="none" stroke="#7a1a10" stroke-width="1"/>
+</svg>'''
 
 
 # ── 8. ELEVATOR ───────────────────────────────────────────────────────────────
@@ -429,6 +611,63 @@ def gen_spring():
 </svg>'''
 
 
+# ── 10b. SPRING EXTENDED (same visual as gen_spring) ─────────────────────────
+def gen_spring_extended():
+    return gen_spring()
+
+
+# ── 10c. SPRING COMPRESSED ────────────────────────────────────────────────────
+def gen_spring_compressed():
+    W, H     = 48, 20
+    BASE_H   = 5
+    PAD_H    = 5
+    # Compressed: top pad at y=8..13, coils at y=13..15, base at y=15..20
+    PAD_Y    = 8
+    COIL_Y   = PAD_Y + PAD_H   # 13
+    COIL_H   = 2                # very thin coils
+    shine_x  = round(W * 0.14)
+    shine_w  = round(W * 0.44)
+
+    coils = ''.join(
+        f'<rect x="5" y="{COIL_Y + i*COIL_H:.0f}" width="{W-10}" height="{COIL_H}"'
+        f' fill="{"#30c0a0" if i%2==0 else "#1a9e80"}"/>'
+        for i in range(2)
+    )
+    # Compression arrows (small down-pointing chevrons on left and right above pad)
+    arrows = (
+        f'<polyline points="4,{PAD_Y-4} 4,{PAD_Y-1} 7,{PAD_Y-1}"'
+        f' fill="none" stroke="rgba(255,200,0,0.70)" stroke-width="1.5" stroke-linecap="round"/>'
+        f'<polyline points="{W-4},{PAD_Y-4} {W-4},{PAD_Y-1} {W-7},{PAD_Y-1}"'
+        f' fill="none" stroke="rgba(255,200,0,0.70)" stroke-width="1.5" stroke-linecap="round"/>'
+    )
+
+    return f'''<svg xmlns="http://www.w3.org/2000/svg"
+     viewBox="0 0 {W} {H}" width="{W}" height="{H}">
+  <defs>
+    <linearGradient id="base" x1="0" y1="{H-BASE_H}" x2="0" y2="{H}"
+        gradientUnits="userSpaceOnUse">
+      <stop offset="0%"   stop-color="#2a3a50"/>
+      <stop offset="100%" stop-color="#101828"/>
+    </linearGradient>
+    <linearGradient id="pad" x1="0" y1="{PAD_Y}" x2="0" y2="{PAD_Y+PAD_H}"
+        gradientUnits="userSpaceOnUse">
+      <stop offset="0%"   stop-color="#f0ce38"/>
+      <stop offset="100%" stop-color="#c08808"/>
+    </linearGradient>
+  </defs>
+  {coils}
+  <rect x="0" y="{H-BASE_H}" width="{W}" height="{BASE_H}" rx="2"
+        fill="url(#base)" stroke="#080e18" stroke-width="1.2"/>
+  <line x1="4" y1="{H-BASE_H+2}" x2="{W-4}" y2="{H-BASE_H+2}"
+        stroke="rgba(80,150,210,0.28)" stroke-width="1"/>
+  <rect x="0" y="{PAD_Y}" width="{W}" height="{PAD_H}" rx="2"
+        fill="url(#pad)" stroke="#906000" stroke-width="1.2"/>
+  <rect x="{shine_x}" y="{PAD_Y+1}" width="{shine_w}" height="2" rx="1"
+        fill="rgba(255,255,255,0.46)"/>
+  {arrows}
+</svg>'''
+
+
 # ── 11. CANNON ────────────────────────────────────────────────────────────────
 def gen_cannon():
     W, H = 32, 32
@@ -487,7 +726,7 @@ def gen_black_hole():
         for r, c in rings
     )
 
-    # Swirl arcs
+    # Swirl arcs (will be animated)
     swirls = []
     for angle_deg in [30, 120, 210, 300]:
         a = math.radians(angle_deg)
@@ -504,10 +743,16 @@ def gen_black_hole():
 
     return f'''<svg xmlns="http://www.w3.org/2000/svg"
      viewBox="0 0 {W} {H}" width="{W}" height="{H}">
+  <style>
+    @keyframes bh-spin{{from{{transform:rotate(0deg)}}to{{transform:rotate(360deg)}}}}
+    .swirls{{transform-origin:{cx}px {cy}px; transform-box:fill-box; animation:bh-spin 3s linear infinite;}}
+  </style>
   <!-- Outer glow -->
   <circle cx="{cx}" cy="{cy}" r="{R+1}" fill="rgba(140,20,180,0.25)"/>
   {circles}
-  {''.join(swirls)}
+  <g class="swirls">
+    {''.join(swirls)}
+  </g>
   <!-- Edge highlight -->
   <circle cx="{cx-3}" cy="{cy-4}" r="3"
           fill="none" stroke="rgba(220,120,255,0.35)" stroke-width="1"/>
@@ -517,68 +762,52 @@ def gen_black_hole():
 # ── 13. START ZONE ────────────────────────────────────────────────────────────
 def gen_start_zone():
     W, H = 190, 30
-    B = 2
-    # Green gradient panel with white chevron arrows
-    arrows = ''.join(
-        f'<polyline points="{x},{H//2-6} {x+10},{H//2} {x},{H//2+6}"'
-        f' fill="none" stroke="rgba(255,255,255,0.70)" stroke-width="2"'
-        f' stroke-linejoin="round" stroke-linecap="round"/>'
-        for x in range(18, W - 14, 22)
-    )
+    SQ = 15  # checkerboard square size
+    GREEN = '#2ecc71'
+    BLUE  = '#3498db'
+
+    squares = []
+    for row in range(H // SQ + 1):
+        for col in range(W // SQ + 1):
+            rx = col * SQ
+            ry = row * SQ
+            rw = min(SQ, W - rx)
+            rh = min(SQ, H - ry)
+            if rw > 0 and rh > 0:
+                color = GREEN if (row + col) % 2 == 0 else BLUE
+                squares.append(
+                    f'<rect x="{rx}" y="{ry}" width="{rw}" height="{rh}" fill="{color}"/>'
+                )
 
     return f'''<svg xmlns="http://www.w3.org/2000/svg"
-     viewBox="0 0 {W} {H}" width="{W}" height="{H}">
-  <defs>
-    <linearGradient id="sg" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%"   stop-color="#48c868"/>
-      <stop offset="100%" stop-color="#28a048"/>
-    </linearGradient>
-  </defs>
-  <rect x="0" y="0" width="{W}" height="{H}" fill="#1a7830"/>
-  <rect x="{B}" y="{B}" width="{W-2*B}" height="{H-2*B}" fill="url(#sg)"/>
-  <line x1="{B}" y1="{B+1}" x2="{W-B}" y2="{B+1}"
-        stroke="rgba(255,255,255,0.40)" stroke-width="1"/>
-  {arrows}
-  <rect x="1" y="1" width="{W-2}" height="{H-2}"
-        fill="none" stroke="#1a7830" stroke-width="2"/>
+     viewBox="0 0 {W} {H}" width="{W}" height="{H}" opacity="0.55">
+  {''.join(squares)}
 </svg>'''
 
 
 # ── 14. END ZONE ──────────────────────────────────────────────────────────────
 def gen_end_zone():
     W, H = 190, 30
-    B = 2
-    SQ = 5   # checkerboard square size
+    SQ = 15  # checkerboard square size
+    GREEN = '#2ecc71'
+    BLUE  = '#3498db'
 
     squares = []
-    for row in range((H - 2*B) // SQ + 1):
-        for col in range((W - 2*B) // SQ + 1):
-            if (row + col) % 2 == 0:
-                rx = B + col * SQ
-                ry = B + row * SQ
-                rw = min(SQ, W - B - rx)
-                rh = min(SQ, H - B - ry)
-                if rw > 0 and rh > 0:
-                    squares.append(
-                        f'<rect x="{rx}" y="{ry}" width="{rw}" height="{rh}"'
-                        f' fill="rgba(255,220,60,0.55)"/>'
-                    )
+    for row in range(H // SQ + 1):
+        for col in range(W // SQ + 1):
+            rx = col * SQ
+            ry = row * SQ
+            rw = min(SQ, W - rx)
+            rh = min(SQ, H - ry)
+            if rw > 0 and rh > 0:
+                color = BLUE if (row + col) % 2 == 0 else GREEN
+                squares.append(
+                    f'<rect x="{rx}" y="{ry}" width="{rw}" height="{rh}" fill="{color}"/>'
+                )
 
     return f'''<svg xmlns="http://www.w3.org/2000/svg"
-     viewBox="0 0 {W} {H}" width="{W}" height="{H}">
-  <defs>
-    <linearGradient id="eg" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%"   stop-color="#e8b030"/>
-      <stop offset="100%" stop-color="#c08010"/>
-    </linearGradient>
-  </defs>
-  <rect x="0" y="0" width="{W}" height="{H}" fill="#8a5800"/>
-  <rect x="{B}" y="{B}" width="{W-2*B}" height="{H-2*B}" fill="url(#eg)"/>
+     viewBox="0 0 {W} {H}" width="{W}" height="{H}" opacity="0.55">
   {''.join(squares)}
-  <line x1="{B}" y1="{B+1}" x2="{W-B}" y2="{B+1}"
-        stroke="rgba(255,255,255,0.45)" stroke-width="1"/>
-  <rect x="1" y="1" width="{W-2}" height="{H-2}"
-        fill="none" stroke="#8a5800" stroke-width="2"/>
 </svg>'''
 
 
@@ -586,16 +815,22 @@ def gen_end_zone():
 if __name__ == '__main__':
     write('platform_tile.svg',    gen_platform_tile())
     write('moving_platform.svg',  gen_moving_platform())
-    write('conveyor.svg',         gen_conveyor())
     write('ice.svg',              gen_ice())
-    write('shock_platform.svg',   gen_shock_platform())
     write('disappearing.svg',     gen_disappearing())
-    write('flip_platform.svg',    gen_flip_platform())
     write('elevator.svg',         gen_elevator())
     write('spike.svg',            gen_spike())
     write('spring.svg',           gen_spring())
     write('cannon.svg',           gen_cannon())
-    write('black_hole.svg',       gen_black_hole())
-    write('start_zone.svg',       gen_start_zone())
-    write('end_zone.svg',         gen_end_zone())
+    # New / updated sprites
+    write('shock_idle.svg',       gen_shock_idle())
+    write('shock_on.svg',         gen_shock_on())
+    write('flip_safe.svg',        gen_flip_safe())
+    write('flip_spikes.svg',      gen_flip_spikes())
+    write('spring_extended.svg',  gen_spring_extended())
+    write('spring_compressed.svg',gen_spring_compressed())
+    write('conveyor.svg',         gen_conveyor())       # overwrites existing
+    write('conveyor_rev.svg',     gen_conveyor_rev())
+    write('black_hole.svg',       gen_black_hole())     # overwrites existing
+    write('start_zone.svg',       gen_start_zone())     # overwrites existing
+    write('end_zone.svg',         gen_end_zone())       # overwrites existing
     print(f'\nDone — sprites in: {OUT}')
