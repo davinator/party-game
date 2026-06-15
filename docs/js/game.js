@@ -2104,66 +2104,20 @@ class Game {
   _step() {
     if (this.phase==='lobby') return;
 
-    if (this.phase==='waiting') {
-      this._phaseTime += 1/60;
-      this.level.update(this._phaseTime);
-      const lp = this.localPlayer;
-      if (lp) {
-        if (lp._deathT >= DEATH_TOTAL) {
-          // Respawn after contemplating the corpse
-          const sp = this.level.startPos();
-          lp.x=sp.x; lp.y=sp.y; lp.vx=0; lp.vy=0; lp.onGround=false;
-          lp._deathT=-1;
-        } else if (lp._deathT >= 0) {
-          // Currently dying / lying — controls frozen, timer ticking via the global loop above
-        } else {
-          const evt = lp.updateLocal(this.input, this.level, false, false);
-          const hitByProjectile = this.level.projectilesAt(this._phaseTime)
-            .some(p => circleRect(p.x, p.y, p.r, lp.x, lp.y, PW, PH));
-          const cause = hitByProjectile ? 'projectile'
-            : (evt && evt.startsWith('died:') ? evt.slice(5) : 'fall');
-          if (hitByProjectile || (evt && evt.startsWith('died'))) {
-            lp._deathCause = cause;
-            lp._deathX = lp.x; lp._deathY = lp.y;
-            lp._deathFloorY = this.level.floorBelow(lp._deathX, lp._deathY);
-            if (cause === 'projectile') {
-              const projLandX = lp._deathX + (-lp.facing * 3.0) * (2 * 8.0 / GRAVITY);
-              lp._deathProjFloorY = this.level.floorBelow(projLandX, lp._deathY);
-            } else { lp._deathProjFloorY = null; }
-            lp._deathT = 0;
-          }
-        }
-      }
-      for (const p of Object.values(this.players)) {
-        if (p.id !== this.localId) p.updateRemote(this.level.solids);
-      }
-      this._sendTick = (this._sendTick||0) + 1;
-      if (lp) {
-        const iv = this._sendInterval();
-        if (this._sendTick % iv === 0) this.net.broadcast({ type:'player_update', ...lp.snap() });
-      }
-      // Tick death timers (waiting phase returns before the main timer loop below)
-      for (const p of Object.values(this.players)) {
-        if (p._deathT >= 0 && p._deathT < DEATH_TOTAL) p._deathT += 1/60;
-      }
-      return;
-    }
-
     this._phaseTime += 1/60;
     this.level.update(this._phaseTime);
 
-    if (this.timer>0) {
-      this.timer-=1/60;
-      if (this.timer<0) this.timer=0;
-    }
-
-    if (this.timer===0 && this.isHost) {
-      if (this.phase==='build') {
-        this._applyPhase('countdown', COUNTDOWN_TIME);
-        this.net.broadcast({ type:'phase_change', newPhase:'countdown', timer:COUNTDOWN_TIME });
-      } else if (this.phase==='countdown') {
-        this._applyPhase('play', PLAY_TIME);
-        this.net.broadcast({ type:'phase_change', newPhase:'play', timer:PLAY_TIME });
+    // Phase timer — not used in waiting room
+    if (this.phase !== 'waiting') {
+      if (this.timer>0) { this.timer-=1/60; if (this.timer<0) this.timer=0; }
+      if (this.timer===0 && this.isHost) {
+        if (this.phase==='build') {
+          this._applyPhase('countdown', COUNTDOWN_TIME);
+          this.net.broadcast({ type:'phase_change', newPhase:'countdown', timer:COUNTDOWN_TIME });
+        } else if (this.phase==='countdown') {
+          this._applyPhase('play', PLAY_TIME);
+          this.net.broadcast({ type:'phase_change', newPhase:'play', timer:PLAY_TIME });
+        }
       }
     }
 
@@ -2178,62 +2132,84 @@ class Game {
 
     const lp=this.localPlayer;
     if (lp) {
-      const evt=lp.updateLocal(this.input, this.level, this.placement.active);
-
-      this._resolvePlayerCollisions();
-
-      // Trigger disappearing platform on first contact
-      const ridingNow = lp._riding;
-      if (ridingNow && ridingNow.type==='disappearing' && !ridingNow._triggered) {
-        ridingNow._triggered = true; ridingNow._triggerT = this._phaseTime;
-        this.net.broadcast({ type:'platform_trigger', id:ridingNow.id, t:this._phaseTime });
-      }
-
-      const diedByPhysics = evt && evt.startsWith('died') && lp.state==='alive';
-      const diedByProjectile = lp.state==='alive' && this.level.projectilesAt(this._phaseTime)
-          .some(p=>circleRect(p.x,p.y,p.r, lp.x,lp.y,PW,PH));
-      const _died = diedByPhysics || diedByProjectile;
-      const deathCause = diedByProjectile ? 'projectile'
-        : (evt && evt.startsWith('died:') ? evt.slice(5) : 'fall');
-
-      if (_died) {
-        if (this.phase==='build') {
-          // Build phase: respawn in place, keep ghost appearance
-          const sp = this.level.startPos();
-          lp.x=sp.x; lp.y=sp.y; lp.vx=0; lp.vy=0; lp.onGround=false; lp._coyote=0; lp._jbuf=0;
-        } else {
-          // Play phase: permanent death → ghost
-          lp._deathCause = deathCause;
-          lp._deathX = lp.x; lp._deathY = lp.y;
-          lp._deathFloorY = this.level.floorBelow(lp._deathX, lp._deathY);
-          if (deathCause === 'projectile') {
-            const projLandX = lp._deathX + (-lp.facing * 3.0) * (2 * 8.0 / GRAVITY);
-            lp._deathProjFloorY = this.level.floorBelow(projLandX, lp._deathY);
-          } else { lp._deathProjFloorY = null; }
-          lp.state='dead'; lp.ghostMode=true; lp._deathT=0;
-          this.net.broadcast({ type:'player_event', playerId:this.localId, event:'died', cause:deathCause });
-          this._deathOrder.push(this.localId);
-          const tot=Object.keys(this.players).length;
-          lp.placementsLeft = this._deathOrder.length<=Math.ceil(tot*0.5) ? 1 : 0;
-        }
-      }
-
-      if (evt==='finished' && lp.state==='alive' && this.phase==='play') {
-        lp.state='finished';
-        this.net.broadcast({ type:'player_event', playerId:this.localId, event:'finished' });
-      }
-
-      // Ghost fell off world — teleport back without changing state
-      if (lp.state==='dead' && lp.y > DEATH_Y + 50) {
+      // Waiting room: respawn once death/appreciation sequence finishes
+      if (this.phase==='waiting' && lp._deathT >= DEATH_TOTAL) {
         const sp = this.level.startPos();
-        lp.x=sp.x; lp.y=sp.y; lp.vx=0; lp.vy=0;
+        lp.x=sp.x; lp.y=sp.y; lp.vx=0; lp.vy=0; lp.onGround=false;
+        lp._deathT=-1;
       }
 
-      if (this.isHost && this.phase==='play') {
-        const active = Object.values(this.players).filter(p=>p.state==='alive');
-        if (active.length===0) {
-          this._applyPhase('results', RESULTS_TIME);
-          this.net.broadcast({ type:'phase_change', newPhase:'results', timer:RESULTS_TIME });
+      // Freeze controls during death animation in waiting room
+      const frozen = this.phase==='waiting' && lp._deathT >= 0;
+      if (!frozen) {
+        const evt=lp.updateLocal(this.input, this.level,
+          this.phase!=='waiting' && this.placement.active);
+
+        this._resolvePlayerCollisions();
+
+        // Trigger disappearing platform on first contact
+        const ridingNow = lp._riding;
+        if (ridingNow && ridingNow.type==='disappearing' && !ridingNow._triggered) {
+          ridingNow._triggered = true; ridingNow._triggerT = this._phaseTime;
+          this.net.broadcast({ type:'platform_trigger', id:ridingNow.id, t:this._phaseTime });
+        }
+
+        const diedByPhysics = evt && evt.startsWith('died') && lp.state==='alive';
+        const diedByProjectile = lp.state==='alive' && this.level.projectilesAt(this._phaseTime)
+            .some(p=>circleRect(p.x,p.y,p.r, lp.x,lp.y,PW,PH));
+        const _died = diedByPhysics || diedByProjectile;
+        const deathCause = diedByProjectile ? 'projectile'
+          : (evt && evt.startsWith('died:') ? evt.slice(5) : 'fall');
+
+        if (_died) {
+          if (this.phase==='waiting') {
+            // Waiting room: trigger death animation, respawn when it finishes
+            lp._deathCause = deathCause;
+            lp._deathX = lp.x; lp._deathY = lp.y;
+            lp._deathFloorY = this.level.floorBelow(lp._deathX, lp._deathY);
+            if (deathCause === 'projectile') {
+              const projLandX = lp._deathX + (-lp.facing * 3.0) * (2 * 8.0 / GRAVITY);
+              lp._deathProjFloorY = this.level.floorBelow(projLandX, lp._deathY);
+            } else { lp._deathProjFloorY = null; }
+            lp._deathT = 0;
+          } else if (this.phase==='build') {
+            // Build phase: instant respawn
+            const sp = this.level.startPos();
+            lp.x=sp.x; lp.y=sp.y; lp.vx=0; lp.vy=0; lp.onGround=false; lp._coyote=0; lp._jbuf=0;
+          } else {
+            // Play phase: permanent death → ghost
+            lp._deathCause = deathCause;
+            lp._deathX = lp.x; lp._deathY = lp.y;
+            lp._deathFloorY = this.level.floorBelow(lp._deathX, lp._deathY);
+            if (deathCause === 'projectile') {
+              const projLandX = lp._deathX + (-lp.facing * 3.0) * (2 * 8.0 / GRAVITY);
+              lp._deathProjFloorY = this.level.floorBelow(projLandX, lp._deathY);
+            } else { lp._deathProjFloorY = null; }
+            lp.state='dead'; lp.ghostMode=true; lp._deathT=0;
+            this.net.broadcast({ type:'player_event', playerId:this.localId, event:'died', cause:deathCause });
+            this._deathOrder.push(this.localId);
+            const tot=Object.keys(this.players).length;
+            lp.placementsLeft = this._deathOrder.length<=Math.ceil(tot*0.5) ? 1 : 0;
+          }
+        }
+
+        if (evt==='finished' && lp.state==='alive' && this.phase==='play') {
+          lp.state='finished';
+          this.net.broadcast({ type:'player_event', playerId:this.localId, event:'finished' });
+        }
+
+        // Ghost fell off world — teleport back without changing state
+        if (lp.state==='dead' && lp.y > DEATH_Y + 50) {
+          const sp = this.level.startPos();
+          lp.x=sp.x; lp.y=sp.y; lp.vx=0; lp.vy=0;
+        }
+
+        if (this.isHost && this.phase==='play') {
+          const active = Object.values(this.players).filter(p=>p.state==='alive');
+          if (active.length===0) {
+            this._applyPhase('results', RESULTS_TIME);
+            this.net.broadcast({ type:'phase_change', newPhase:'results', timer:RESULTS_TIME });
+          }
         }
       }
     }
@@ -2348,7 +2324,7 @@ class Game {
     this.level.draw(ctx);
 
     // Draw cannon projectiles
-    if (this.phase==='play') {
+    if (this.phase==='play' || this.phase==='waiting') {
       ctx.fillStyle='#e74c3c';
       for (const p of this.level.projectilesAt(this._phaseTime)) {
         ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI*2); ctx.fill();
