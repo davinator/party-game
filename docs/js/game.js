@@ -573,14 +573,15 @@ class GO {
   }
 
   _dFlip(ctx, x, y, w, h) {
-    if (this._flipped) {
-      sprites.draw(ctx, 'flip_platform', 'flipped', x, y, w, h);
+    const angle = this._flipAngle || 0;
+    if (angle < Math.PI / 2) {
+      // First half: safe side folding away (cos 1→0)
+      const dh = Math.max(2, Math.cos(angle) * h);
+      sprites.draw(ctx, 'flip_platform', 'idle', x, y + (h - dh) / 2, w, dh);
     } else {
-      const angle = this._flipAngle || 0;
-      const scaleY = Math.cos(angle);
-      const dh = Math.max(2, Math.abs(scaleY) * h);
-      const dy = (h - dh) / 2;
-      sprites.draw(ctx, 'flip_platform', 'idle', x, y + dy, w, dh);
+      // Second half AND fully flipped: spike side unfolding (-cos 0→1)
+      const dh = Math.max(2, -Math.cos(angle) * h);
+      sprites.draw(ctx, 'flip_platform', 'flipped', x, y + (h - dh) / 2, w, dh);
     }
   }
 
@@ -618,19 +619,23 @@ class GO {
     const bcx = x + w/2, bcy = y + h/2;
     const r = Math.min(w, h) / 2 - 1;
     const angle = this._spinAngle || 0;
-    // Outer glow
-    const grd = ctx.createRadialGradient(bcx, bcy, r*0.3, bcx, bcy, r);
-    grd.addColorStop(0, '#2d1b69');
-    grd.addColorStop(1, 'rgba(20,5,60,0.25)');
+    // Near-black base disc
+    ctx.fillStyle = '#03010a';
+    ctx.beginPath(); ctx.arc(bcx, bcy, r, 0, Math.PI*2); ctx.fill();
+    // Subtle purple edge ring only
+    const grd = ctx.createRadialGradient(bcx, bcy, r*0.65, bcx, bcy, r);
+    grd.addColorStop(0, 'rgba(60,15,100,0.0)');
+    grd.addColorStop(0.7, 'rgba(90,25,140,0.40)');
+    grd.addColorStop(1, 'rgba(120,40,180,0.22)');
     ctx.fillStyle = grd;
     ctx.beginPath(); ctx.arc(bcx, bcy, r, 0, Math.PI*2); ctx.fill();
-    // 3 spinning spiral arms
+    // 3 spinning spiral arms — purple but dimmer
     ctx.save(); ctx.translate(bcx, bcy);
     for (let i = 0; i < 3; i++) {
       const a0 = angle + i * Math.PI * 2 / 3;
       ctx.beginPath();
-      ctx.strokeStyle = i === 0 ? 'rgba(160,80,255,0.8)' : i === 1 ? 'rgba(100,60,220,0.7)' : 'rgba(200,100,255,0.65)';
-      ctx.lineWidth = 2;
+      ctx.strokeStyle = i === 0 ? 'rgba(150,70,255,0.55)' : i === 1 ? 'rgba(100,50,210,0.50)' : 'rgba(180,90,255,0.45)';
+      ctx.lineWidth = 1.5;
       for (let s = 0; s <= 1; s += 0.05) {
         const sr = r * 0.14 + s * r * 0.82;
         const sa = a0 - s * Math.PI * 1.9;
@@ -640,9 +645,9 @@ class GO {
       ctx.stroke();
     }
     ctx.restore();
-    // Dark core
-    ctx.fillStyle = '#000008';
-    ctx.beginPath(); ctx.arc(bcx, bcy, r*0.3, 0, Math.PI*2); ctx.fill();
+    // Large dark core — more prominent black centre
+    ctx.fillStyle = '#000004';
+    ctx.beginPath(); ctx.arc(bcx, bcy, r*0.50, 0, Math.PI*2); ctx.fill();
     // Kill zone hint
     ctx.fillStyle = 'rgba(255,20,20,0.3)';
     ctx.beginPath(); ctx.arc(bcx, bcy, BH_KILL_RADIUS, 0, Math.PI*2); ctx.fill();
