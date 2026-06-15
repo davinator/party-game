@@ -93,6 +93,18 @@ const BASE_LEVEL = [
   { id:'bl_ez',    type:'end_zone',   x:2920, y:660, w:190, h:30 },
 ];
 
+const CLEAN_SLATE_LEVEL = [
+  { id:'cs_start', type:'platform',   x:32,   y:730, w:256, h:30, permanent:true },
+  { id:'cs_end',   type:'platform',   x:2892, y:690, w:256, h:30, permanent:true },
+  { id:'cs_sz',    type:'start_zone', x:58,   y:700, w:190, h:30 },
+  { id:'cs_ez',    type:'end_zone',   x:2920, y:660, w:190, h:30 },
+];
+
+const LEVELS = {
+  default:     { name:'Default',     objects: BASE_LEVEL },
+  clean_slate: { name:'Clean Slate', objects: CLEAN_SLATE_LEVEL },
+};
+
 // ─────────────────────────────────────────────
 //  WAITING ROOM LEVEL
 // ─────────────────────────────────────────────
@@ -748,7 +760,10 @@ class GO {
 class Level {
   constructor() { this.objects=[]; this.reset(); }
 
-  reset() { this.objects = BASE_LEVEL.map(o => new GO({...o})); }
+  reset(levelId = 'default') {
+    const lvl = LEVELS[levelId] || LEVELS.default;
+    this.objects = lvl.objects.map(o => new GO({...o}));
+  }
 
   add(data)   { const o=new GO(data); this.objects.push(o); return o; }
   remove(id)  { this.objects = this.objects.filter(o=>o.id!==id); }
@@ -2047,6 +2062,7 @@ class Game {
     net.on('state_sync', msg=>{
       if (msg.to!==this.localId) return;
       this.scores=msg.scores; this.round=msg.round; this.totalRounds=msg.totalRounds||DEFAULT_ROUNDS;
+      if (msg.levelId) this._levelId = msg.levelId;
       msg.players.forEach(p=>{
         if (p.id!==this.localId) this._addPlayer(p.id,p.name,p.team,p.colorIdx);
         const pl=this.players[p.id];
@@ -2076,6 +2092,7 @@ class Game {
         type:'state_sync', to:msg.targetPlayerId,
         objects:this.level.serialize(), phase:this.phase, timer:this.timer,
         scores:this.scores, round:this.round, totalRounds:this.totalRounds, players:pArr,
+        levelId: this._levelId || 'default',
       });
     });
 
@@ -2084,6 +2101,7 @@ class Game {
       if (msg.round       !== undefined) this.round       = msg.round;
       if (msg.totalRounds !== undefined) this.totalRounds = msg.totalRounds;
       if (msg.scores      !== undefined) this.scores      = msg.scores;
+      if (msg.levelId     !== undefined) this._levelId    = msg.levelId;
       this._applyPhase(msg.newPhase, msg.timer);
     });
 
@@ -2200,12 +2218,14 @@ class Game {
   _hostStartBuild() {
     const el = document.getElementById('rounds-count');
     this.totalRounds = el ? Math.max(1, parseInt(el.value)||DEFAULT_ROUNDS) : DEFAULT_ROUNDS;
+    const lvlEl = document.getElementById('level-select');
+    this._levelId = (lvlEl && LEVELS[lvlEl.value]) ? lvlEl.value : 'default';
     this.round = 1;
     this.scores = { green:0, blue:0 };
     this._deathOrder = [];
     this._applyPhase('build', BUILD_TIME);
     this.net.broadcast({ type:'phase_change', newPhase:'build', timer:BUILD_TIME,
-      round:1, totalRounds:this.totalRounds, scores:this.scores });
+      round:1, totalRounds:this.totalRounds, scores:this.scores, levelId:this._levelId });
   }
 
   _applyPhase(phase, timer) {
@@ -2214,7 +2234,7 @@ class Game {
     if (phase==='waiting') { this._enterWaiting(); return; }
 
     if (phase==='build') {
-      if (this.round===1) this.level.reset(); // only on new-game first round
+      if (this.round===1) this.level.reset(this._levelId || 'default');
       this._enterGame();
       this._spawnPlayers();
       const n = Object.keys(this.players).length;
