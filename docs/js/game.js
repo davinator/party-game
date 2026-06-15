@@ -69,8 +69,8 @@ const CANNON_PERIOD  = 3.0; // seconds between shots
 const CANNON_SPEED   = 7;   // pixels per tick
 const CANNON_RANGE   = 700; // pixels before projectile despawns
 const BH_PULL_RADIUS = 280; // pixels of influence
-const BH_KILL_RADIUS = 22;  // pixels from centre = instant death
-const BH_FORCE       = 0.35;// pull acceleration per tick (scales with proximity)
+const BH_KILL_RADIUS = 6;   // pixels from centre = instant death (very center only)
+const BH_FORCE       = 0.75;// pull acceleration per tick (scales with proximity)
 
 const PALETTE = [
   '#e74c3c','#e67e22','#f1c40f','#2ecc71',
