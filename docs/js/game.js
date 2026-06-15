@@ -560,6 +560,17 @@ class Level {
 
   get solids()  { return this.objects.filter(o=>o.solid && !o._gone && !(o.type==='flip_platform'&&o._flipped)); }
   get hazards() { return this.objects.filter(o=>o.hazard||(o.type==='shock_platform'&&o.shocked)||(o.type==='flip_platform'&&o._flipped)); }
+
+  // First solid surface directly below (cx, cy+PH). Returns WORLD_H+300 if no floor found (void).
+  floorBelow(cx, cy) {
+    const feetY = cy + PH;
+    let best = WORLD_H + 300;
+    for (const s of this.solids) {
+      if (s.x + s.w > cx + 2 && s.x < cx + PW - 2 && s.y >= feetY && s.y < best)
+        best = s.y;
+    }
+    return best;
+  }
   get springs() { return this.objects.filter(o=>o.isSpring); }
   get endZone() { return this.objects.find(o=>o.isEnd); }
 
@@ -601,6 +612,8 @@ class Player {
     this._deathT=-1;  // -1 = not dying; counts up to DEATH_TOTAL
     this._deathCause='fall'; // 'fall' | 'spike' | 'shock' | 'projectile' | 'black_hole'
     this._deathX=null; this._deathY=null; // saved position so body stays put while ghost roams
+    this._deathFloorY=null;      // first solid surface below death position
+    this._deathProjFloorY=null;  // first solid below projectile landing spot
     this._danceT=0;   // > 0 while holding Z or finished
     // Dead reckoning for remote players
     this._remX=0; this._remY=0; this._remVX=0; this._remVY=0; this._remAge=0;
@@ -996,7 +1009,8 @@ class Player {
   }
 
   _deathFallY(baseY) {
-    const maxFall = Math.max(0, WORLD_H - 80 - PH - baseY);
+    const floorY  = this._deathFloorY != null ? this._deathFloorY : WORLD_H + 300;
+    const maxFall = Math.max(0, floorY - PH - baseY);
     const n = this._deathT * 60;
     return Math.min(maxFall, 0.5 * GRAVITY * n * n);
   }
@@ -1125,14 +1139,20 @@ class Player {
       this._drawBodySimple(ctx, x, y, tc);
       ctx.restore();
     } else {
-      // Landed: body lies flat at the landing X position
-      const landX = Math.round(VX * n_land);
+      // Arc landed — secondary gravity fall from death Y to the actual floor
+      const landX    = Math.round(VX * n_land);
+      const floorY   = this._deathProjFloorY != null ? this._deathProjFloorY : WORLD_H + 300;
+      const maxFall2 = Math.max(0, floorY - PH - y);
+      const secN     = n - n_land;
+      const secFall  = Math.min(maxFall2, 0.5 * GRAVITY * secN * secN);
+      // Only draw if still on-screen (void falls disappear naturally)
+      if (y + secFall > WORLD_H + 100) return;
       const alpha = dt >= DEATH_ANIM_DUR + DEATH_LIE_DUR
         ? Math.max(0, 1 - (dt - DEATH_ANIM_DUR - DEATH_LIE_DUR) / DEATH_FADE_DUR)
         : 1;
       ctx.save();
       ctx.globalAlpha = alpha;
-      this._drawDeathFlat(ctx, x + landX, y, tc);
+      this._drawDeathFlat(ctx, x + landX, y + secFall, tc);
       ctx.restore();
     }
   }
@@ -1858,6 +1878,11 @@ class Game {
       if (msg.event==='died') {
         p._deathCause = msg.cause || 'fall';
         p._deathX = p.x; p._deathY = p.y;
+        p._deathFloorY = this.level.floorBelow(p._deathX, p._deathY);
+        if (p._deathCause === 'projectile') {
+          const projLandX = p._deathX + (-p.facing * 3.0) * (2 * 8.0 / GRAVITY);
+          p._deathProjFloorY = this.level.floorBelow(projLandX, p._deathY);
+        } else { p._deathProjFloorY = null; }
         p.state='dead'; p.ghostMode=true; p._deathT=0;
         if (this.phase==='play') this._deathOrder.push(msg.playerId);
       }
@@ -2088,6 +2113,8 @@ class Game {
           if (evt && evt.startsWith('died')) {
             lp._deathCause = evt.startsWith('died:') ? evt.slice(5) : 'fall';
             lp._deathX = lp.x; lp._deathY = lp.y;
+            lp._deathFloorY = this.level.floorBelow(lp._deathX, lp._deathY);
+            lp._deathProjFloorY = null;
             lp._deathT = 0;
           }
         }
@@ -2163,6 +2190,11 @@ class Game {
           // Play phase: permanent death → ghost
           lp._deathCause = deathCause;
           lp._deathX = lp.x; lp._deathY = lp.y;
+          lp._deathFloorY = this.level.floorBelow(lp._deathX, lp._deathY);
+          if (deathCause === 'projectile') {
+            const projLandX = lp._deathX + (-lp.facing * 3.0) * (2 * 8.0 / GRAVITY);
+            lp._deathProjFloorY = this.level.floorBelow(projLandX, lp._deathY);
+          } else { lp._deathProjFloorY = null; }
           lp.state='dead'; lp.ghostMode=true; lp._deathT=0;
           this.net.broadcast({ type:'player_event', playerId:this.localId, event:'died', cause:deathCause });
           this._deathOrder.push(this.localId);
