@@ -95,14 +95,60 @@ const BASE_LEVEL = [
 
 const CLEAN_SLATE_LEVEL = [
   { id:'cs_start', type:'platform',   x:32,   y:730, w:256, h:30, permanent:true },
+  { id:'cs_p1',    type:'platform',   x:1450, y:650, w:300, h:30, permanent:true },
   { id:'cs_end',   type:'platform',   x:2892, y:690, w:256, h:30, permanent:true },
   { id:'cs_sz',    type:'start_zone', x:58,   y:700, w:190, h:30 },
   { id:'cs_ez',    type:'end_zone',   x:2920, y:660, w:190, h:30 },
 ];
 
+const UNFAVOURABLE_WINDS_LEVEL = [
+  // Start zone (bottom left)
+  { id:'uw_start',  type:'platform',   x:32,   y:730, w:256, h:30, permanent:true },
+  { id:'uw_sz',     type:'start_zone', x:58,   y:700, w:190, h:30 },
+  // End zone (bottom right)
+  { id:'uw_end',    type:'platform',   x:2880, y:730, w:256, h:30, permanent:true },
+  { id:'uw_ez',     type:'end_zone',   x:2910, y:700, w:190, h:30 },
+  // Central tower body
+  { id:'uw_tower',  type:'platform',   x:1490, y:130, w:220, h:650, permanent:true },
+  // Conveyors on tower top — left half push left, right half push right
+  { id:'uw_c1', type:'conveyor', x:1490, y:100, w:55, h:30, rotation:180, permanent:true },
+  { id:'uw_c2', type:'conveyor', x:1545, y:100, w:55, h:30, rotation:180, permanent:true },
+  { id:'uw_c3', type:'conveyor', x:1600, y:100, w:55, h:30, rotation:0,   permanent:true },
+  { id:'uw_c4', type:'conveyor', x:1655, y:100, w:55, h:30, rotation:0,   permanent:true },
+  // Left climbing platforms
+  { id:'uw_lp1', type:'platform', x:130,  y:630, w:128, h:30, permanent:true },
+  { id:'uw_lp2', type:'platform', x:330,  y:510, w:128, h:30, permanent:true },
+  { id:'uw_lp3', type:'platform', x:530,  y:400, w:128, h:30, permanent:true },
+  { id:'uw_lp4', type:'platform', x:300,  y:290, w:128, h:30, permanent:true },
+  { id:'uw_lp5', type:'platform', x:680,  y:310, w:128, h:30, permanent:true },
+  { id:'uw_lp6', type:'platform', x:880,  y:210, w:128, h:30, permanent:true },
+  { id:'uw_lp7', type:'platform', x:1100, y:160, w:128, h:30, permanent:true },
+  { id:'uw_lp8', type:'platform', x:1330, y:130, w:128, h:30, permanent:true },
+  // Left sawblades
+  { id:'uw_s1', type:'sawblade', x:240, y:575, w:44, h:44, permanent:true },
+  { id:'uw_s2', type:'sawblade', x:430, y:460, w:44, h:44, permanent:true },
+  { id:'uw_s3', type:'sawblade', x:750, y:365, w:44, h:44, permanent:true },
+  { id:'uw_s4', type:'sawblade', x:970, y:248, w:44, h:44, permanent:true },
+  // Right descending platforms
+  { id:'uw_rp1', type:'platform', x:1740, y:130, w:128, h:30, permanent:true },
+  { id:'uw_rp2', type:'platform', x:1930, y:200, w:128, h:30, permanent:true },
+  { id:'uw_rp3', type:'platform', x:2100, y:300, w:128, h:30, permanent:true },
+  { id:'uw_rp4', type:'platform', x:2300, y:390, w:128, h:30, permanent:true },
+  { id:'uw_rp5', type:'platform', x:2150, y:470, w:128, h:30, permanent:true },
+  { id:'uw_rp6', type:'platform', x:2380, y:540, w:128, h:30, permanent:true },
+  { id:'uw_rp7', type:'platform', x:2580, y:620, w:128, h:30, permanent:true },
+  { id:'uw_rp8', type:'platform', x:2740, y:690, w:128, h:30, permanent:true },
+  // Right sawblades
+  { id:'uw_s5', type:'sawblade', x:1980, y:158, w:44, h:44, permanent:true },
+  { id:'uw_s6', type:'sawblade', x:2220, y:350, w:44, h:44, permanent:true },
+  { id:'uw_s7', type:'sawblade', x:2440, y:500, w:44, h:44, permanent:true },
+  { id:'uw_s8', type:'sawblade', x:2645, y:578, w:44, h:44, permanent:true },
+];
+
 const LEVELS = {
-  default:     { name:'Default',     objects: BASE_LEVEL },
-  clean_slate: { name:'Clean Slate', objects: CLEAN_SLATE_LEVEL },
+  default:             { name:'Default',             objects: BASE_LEVEL },
+  clean_slate:         { name:'Clean Slate',         objects: CLEAN_SLATE_LEVEL },
+  unfavourable_winds:  { name:'Unfavourable Winds',  objects: UNFAVOURABLE_WINDS_LEVEL },
 };
 
 // ─────────────────────────────────────────────
@@ -188,6 +234,7 @@ const SPRITE_MANIFEST = {
   spring:           { fw:48,  fh:20, anims:{ idle:{ src:'sprites/spring_extended.svg', row:0,frames:1,fps:1 }, compressed:{ src:'sprites/spring_compressed.svg', row:0,frames:1,fps:1 } } },
   cannon:           { src:'sprites/cannon.svg',     fw:32,  fh:32, anims:{ idle:{row:0,frames:1,fps:1} } },
   black_hole:       { src:'sprites/black_hole.svg', fw:40,  fh:40, anims:{ spin:{row:0,frames:1,fps:1} } },
+  sawblade:         { src:'sprites/sawblade.svg',   fw:40,  fh:40, anims:{ idle:{row:0,frames:1,fps:1} } },
   start_zone:       { src:'sprites/start_zone.svg', fw:190, fh:30, anims:{ idle:{row:0,frames:1,fps:1} } },
   end_zone:         { src:'sprites/end_zone.svg',   fw:190, fh:30, anims:{ idle:{row:0,frames:1,fps:1} } },
 };
@@ -386,7 +433,7 @@ class GO {
     this.placedBy  = d.placedBy || null;
     this.team      = d.team || null;
     this.solid     = ['platform','moving_platform','conveyor','ice','shock_platform','disappearing','flip_platform','elevator','cannon'].includes(d.type);
-    this.hazard    = d.type === 'spike';
+    this.hazard    = d.type === 'spike' || d.type === 'sawblade';
     this.isSpring  = d.type === 'spring';
     this.isEnd     = d.type === 'end_zone';
     this.shocked      = false; // shock_platform active state
@@ -451,6 +498,7 @@ class GO {
       if (prevPhase !== undefined && prevPhase > this._firePhase) this._sfxEvent = 'cannon_fire';
     }
     if (this.type === 'black_hole') { this._spinAngle = t * 1.5; }
+    if (this.type === 'sawblade')   { this._spinAngle = t * 4; }
     if (this.type === 'conveyor')   { this._scrollT = (t * CONVEYOR_SPEED * 2) % 18; }
     if (this.type === 'spring')     { this._compressed = (this._compressTill != null && t < this._compressTill); }
     if (this.type === 'elevator') {
@@ -502,7 +550,7 @@ class GO {
     // Range track drawn before sprite so it sits behind the platform body
     if (this.type === 'moving_platform') this._dMovingPlatTrack(ctx, w, h);
     // Types with custom animated draw code bypass the sprite system
-    const CUSTOM_DRAW = new Set(['cannon','shock_platform','disappearing','flip_platform','black_hole','conveyor']);
+    const CUSTOM_DRAW = new Set(['cannon','shock_platform','disappearing','flip_platform','black_hole','conveyor','sawblade']);
     if (!CUSTOM_DRAW.has(this.type) && sprites.draw(ctx, this.type, this._spriteAnim(), x, y, w, h)) return;
     switch(this.type) {
       case 'platform':        this._dPlat(ctx,x,y,w,h);         break;
@@ -517,6 +565,7 @@ class GO {
       case 'elevator':        this._dElevator(ctx,x,y,w,h);               break;
       case 'cannon':          this._dCannon(ctx,x,y,w,h);                 break;
       case 'black_hole':      this._dBlackHole(ctx,x,y,w,h);             break;
+      case 'sawblade':        this._dSawblade(ctx,x,y,w,h);              break;
       case 'start_zone':      this._dZone(ctx,x,y,w,h,'#2ecc71','#3498db'); break;
       case 'end_zone':        this._dZone(ctx,x,y,w,h,'#3498db','#2ecc71'); break;
     }
@@ -725,6 +774,17 @@ class GO {
     ctx.translate(cx, cy);
     ctx.rotate(angle);
     ctx.drawImage(img, -dw/2, -dh/2, dw, dh);
+    ctx.restore();
+  }
+
+  _dSawblade(ctx, x, y, w, h) {
+    const img = sprites._imgs['sawblade'];
+    if (!img || !img.complete || !img.naturalWidth) return;
+    const cx = x + w/2, cy = y + h/2;
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(this._spinAngle || 0);
+    ctx.drawImage(img, -w/2, -h/2, w, h);
     ctx.restore();
   }
 
@@ -947,6 +1007,12 @@ class Player {
         // No top/side inset and extend 1px below feet so standing on the surface triggers
         if (overlap(this.x+3, this.y, PW-6, PH+1, hz.x, hz.y, hz.w, hz.h))
           return 'died:shock';
+      } else if (hz.type === 'sawblade') {
+        const scx = hz.x + hz.w/2, scy = hz.y + hz.h/2;
+        const pcx = this.x + PW/2,  pcy = this.y + PH/2;
+        const dx = pcx - scx, dy = pcy - scy;
+        if (dx*dx + dy*dy < (hz.w/2 + 10) * (hz.w/2 + 10))
+          return 'died:spike';
       } else {
         if (overlap(this.x+3, this.y+3, PW-6, PH-6, hz.x, hz.y, hz.w, hz.h))
           return 'died:spike';
