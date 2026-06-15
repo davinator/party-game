@@ -861,31 +861,46 @@ class Player {
     const ay = y - hoverY;  // vertically adjusted origin
 
     // ── Legs ──
-    let llX = x+5, lrX = x+15;
-    let llY = ay+27, lrY = ay+27;
-    let llH = 13, lrH = 13;
-
     if (dancing) {
-      llH = 13 + Math.round(Math.sin(dancePhase * 6)           * 5);
-      lrH = 13 + Math.round(Math.sin(dancePhase * 6 + Math.PI) * 5);
-    } else if (falling) {
-      llX = x+3; lrX = x+17; llH = 11; lrH = 11;  // legs spread in fall
+      const llH = 13 + Math.round(Math.sin(dancePhase * 6)           * 5);
+      const lrH = 13 + Math.round(Math.sin(dancePhase * 6 + Math.PI) * 5);
+      ctx.fillStyle = 'rgba(255,255,255,0.4)';
+      ctx.fillRect(x+4,  ay+26, 8, llH+2);
+      ctx.fillRect(x+14, ay+26, 8, lrH+2);
+      ctx.fillStyle = tc.primary;
+      ctx.fillRect(x+5,  ay+27, 6, Math.max(4, llH));
+      ctx.fillRect(x+15, ay+27, 6, Math.max(4, lrH));
+      ctx.fillStyle = tc.light;
+      ctx.fillRect(x+5,  ay+27, 6, 2);
+      ctx.fillRect(x+15, ay+27, 6, 2);
     } else if (!inAir) {
-      // Lift each leg as it swings forward — whole leg shifts up, no spreading
-      llY = ay+27 - Math.round(Math.max(0,  sw) * 5);
-      lrY = ay+27 - Math.round(Math.max(0, -sw) * 5);
+      // Pivot from hip: each leg swings forward/backward like a pendulum
+      const la = sw * 0.4;
+      ctx.save(); ctx.translate(x+8, ay+27); ctx.rotate(la);
+      ctx.fillStyle='rgba(255,255,255,0.4)'; ctx.fillRect(-4,-1,8,15);
+      ctx.fillStyle=tc.primary;               ctx.fillRect(-3, 0,6,13);
+      ctx.fillStyle=tc.light;                 ctx.fillRect(-3, 0,6, 2);
+      ctx.restore();
+      ctx.save(); ctx.translate(x+18, ay+27); ctx.rotate(-la);
+      ctx.fillStyle='rgba(255,255,255,0.4)'; ctx.fillRect(-4,-1,8,15);
+      ctx.fillStyle=tc.primary;               ctx.fillRect(-3, 0,6,13);
+      ctx.fillStyle=tc.light;                 ctx.fillRect(-3, 0,6, 2);
+      ctx.restore();
+    } else {
+      // Airborne: falling fast = legs spread apart, otherwise straight
+      const llX = falling ? x+3 : x+5;
+      const lrX = falling ? x+17 : x+15;
+      const legH = falling ? 11 : 13;
+      ctx.fillStyle = 'rgba(255,255,255,0.4)';
+      ctx.fillRect(llX-1, ay+26, 8, legH+2);
+      ctx.fillRect(lrX-1, ay+26, 8, legH+2);
+      ctx.fillStyle = tc.primary;
+      ctx.fillRect(llX, ay+27, 6, legH);
+      ctx.fillRect(lrX, ay+27, 6, legH);
+      ctx.fillStyle = tc.light;
+      ctx.fillRect(llX, ay+27, 6, 2);
+      ctx.fillRect(lrX, ay+27, 6, 2);
     }
-
-    // White outline behind legs for visibility when crossing body
-    ctx.fillStyle = 'rgba(255,255,255,0.4)';
-    ctx.fillRect(llX-1, llY-1, 8, llH+2);
-    ctx.fillRect(lrX-1, lrY-1, 8, lrH+2);
-    ctx.fillStyle = tc.primary;
-    ctx.fillRect(llX, llY, 6, Math.max(4, llH));
-    ctx.fillRect(lrX, lrY, 6, Math.max(4, lrH));
-    ctx.fillStyle = tc.light;
-    ctx.fillRect(llX, llY, 6, 2);
-    ctx.fillRect(lrX, lrY, 6, 2);
 
     // ── Torso ──
     ctx.fillStyle = tc.primary;
@@ -894,30 +909,55 @@ class Player {
     ctx.fillRect(x+7, ay+12, 12, 3);
 
     // ── Arms ──
-    let laY = ay+13, raY = ay+13, armH = 11;
-
     if (dancing) {
-      laY  = ay+7 - Math.round(Math.sin(dancePhase * 6)           * 7);
-      raY  = ay+7 - Math.round(Math.sin(dancePhase * 6 + Math.PI) * 7);
-      armH = 13;
+      const laY = ay+7 - Math.round(Math.sin(dancePhase * 6)           * 7);
+      const raY = ay+7 - Math.round(Math.sin(dancePhase * 6 + Math.PI) * 7);
+      const armH = 13;
+      ctx.fillStyle = 'rgba(255,255,255,0.4)';
+      ctx.fillRect(x,    laY-1, 7, armH+2);
+      ctx.fillRect(x+19, raY-1, 7, armH+2);
+      ctx.fillStyle = tc.primary;
+      ctx.fillRect(x+1,  laY, 5, armH);
+      ctx.fillRect(x+20, raY, 5, armH);
+      ctx.fillStyle = tc.light;
+      ctx.fillRect(x+1,  laY, 5, 2);
+      ctx.fillRect(x+20, raY, 5, 2);
     } else if (falling) {
-      laY = ay+3; raY = ay+3; armH = 14;  // arms fly up when falling
+      // Arms fly up when falling fast
+      ctx.fillStyle = 'rgba(255,255,255,0.4)';
+      ctx.fillRect(x,    ay+2, 7, 16);
+      ctx.fillRect(x+19, ay+2, 7, 16);
+      ctx.fillStyle = tc.primary;
+      ctx.fillRect(x+1,  ay+3, 5, 14);
+      ctx.fillRect(x+20, ay+3, 5, 14);
+      ctx.fillStyle = tc.light;
+      ctx.fillRect(x+1,  ay+3, 5, 2);
+      ctx.fillRect(x+20, ay+3, 5, 2);
     } else if (!inAir) {
-      // Right arm leads forward when left leg steps (natural opposition)
-      laY = ay+13 + Math.round(sw * 3);
-      raY = ay+13 - Math.round(sw * 3);
+      // Pivot from shoulder: arms swing in opposition to legs (natural gait)
+      const aa = sw * 0.3;
+      ctx.save(); ctx.translate(x+3, ay+13); ctx.rotate(aa);
+      ctx.fillStyle='rgba(255,255,255,0.4)'; ctx.fillRect(-3,-1,7,13);
+      ctx.fillStyle=tc.primary;               ctx.fillRect(-2, 0,5,11);
+      ctx.fillStyle=tc.light;                 ctx.fillRect(-2, 0,5, 2);
+      ctx.restore();
+      ctx.save(); ctx.translate(x+22, ay+13); ctx.rotate(-aa);
+      ctx.fillStyle='rgba(255,255,255,0.4)'; ctx.fillRect(-3,-1,7,13);
+      ctx.fillStyle=tc.primary;               ctx.fillRect(-2, 0,5,11);
+      ctx.fillStyle=tc.light;                 ctx.fillRect(-2, 0,5, 2);
+      ctx.restore();
+    } else {
+      // Airborne idle — straight arms at sides
+      ctx.fillStyle = 'rgba(255,255,255,0.4)';
+      ctx.fillRect(x,    ay+12, 7, 13);
+      ctx.fillRect(x+19, ay+12, 7, 13);
+      ctx.fillStyle = tc.primary;
+      ctx.fillRect(x+1,  ay+13, 5, 11);
+      ctx.fillRect(x+20, ay+13, 5, 11);
+      ctx.fillStyle = tc.light;
+      ctx.fillRect(x+1,  ay+13, 5, 2);
+      ctx.fillRect(x+20, ay+13, 5, 2);
     }
-
-    // White outline behind arms
-    ctx.fillStyle = 'rgba(255,255,255,0.4)';
-    ctx.fillRect(x,    laY-1, 7, armH+2);
-    ctx.fillRect(x+19, raY-1, 7, armH+2);
-    ctx.fillStyle = tc.primary;
-    ctx.fillRect(x+1,  laY, 5, armH);
-    ctx.fillRect(x+20, raY, 5, armH);
-    ctx.fillStyle = tc.light;
-    ctx.fillRect(x+1,  laY, 5, 2);
-    ctx.fillRect(x+20, raY, 5, 2);
 
     // ── Head ──
     ctx.fillStyle = tc.light;
