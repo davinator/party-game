@@ -750,7 +750,8 @@ class Player {
     // Horizontal
     if (goLeft)  this.vx -= MOVE_ACCEL;
     if (goRight) this.vx += MOVE_ACCEL;
-    this.vx = clamp(this.vx, -MOVE_MAX, MOVE_MAX);
+    const _vxCap = this._riding?.type === 'conveyor' ? MOVE_MAX * 2 : MOVE_MAX;
+    this.vx = clamp(this.vx, -_vxCap, _vxCap);
     if (!goLeft && !goRight) {
       const onIce      = this._riding?.type === 'ice';
       const onConveyor = this._riding?.type === 'conveyor';
@@ -792,10 +793,17 @@ class Player {
     this.y += this.vy;
     const riding = this._resolveY(solids);
     if (this.y < -WORLD_H) { this.y = -WORLD_H; if (this.vy < 0) this.vy = 0; }
-    // Conveyor: pull vx toward conveyor speed so player can fight or boost it
+    // Conveyor: additive boost when pressing with it (goes beyond MOVE_MAX),
+    // strong lerp resistance when pressing against or not pressing
     if (riding?.type === 'conveyor') {
       const dir = (riding.rotation === 180) ? -1 : 1;
-      this.vx += (dir * CONVEYOR_SPEED - this.vx) * 0.25;
+      const pressingWith = (dir > 0 && goRight) || (dir < 0 && goLeft);
+      if (pressingWith) {
+        this.vx += dir * CONVEYOR_SPEED;
+      } else {
+        const error = dir * CONVEYOR_SPEED - this.vx;
+        this.vx += error * (error * dir > 0 ? 0.45 : 0.1);
+      }
       this.vx = clamp(this.vx, -MOVE_MAX * 2, MOVE_MAX * 2);
     }
 
