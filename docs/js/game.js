@@ -873,8 +873,9 @@ class Player {
     // ── Legs ──
     if (dancing) {
       const dt = dancePhase * 7;
-      ctx.save(); ctx.translate(x+10, ay+27); ctx.rotate( Math.sin(dt) * 0.5); leg(); ctx.restore();
-      ctx.save(); ctx.translate(x+16, ay+27); ctx.rotate(-Math.sin(dt) * 0.5); leg(); ctx.restore();
+      const sx = Math.round(Math.sin(dt * 0.5) * 2);
+      ctx.save(); ctx.translate(x+10+sx, ay+27); ctx.rotate( Math.sin(dt) * 0.6); leg(); ctx.restore();
+      ctx.save(); ctx.translate(x+16+sx, ay+27); ctx.rotate(-Math.sin(dt) * 0.6); leg(); ctx.restore();
     } else if (!inAir) {
       const la = sw * 0.4;
       ctx.save(); ctx.translate(x+10, ay+27); ctx.rotate( la); leg(); ctx.restore();
@@ -916,12 +917,14 @@ class Player {
 
     // ── Arms (drawn last so raised arms render in front of the head) ──
     if (dancing) {
-      // Alternating raise: left arm pumps up on positive beat, right on negative
-      const beat = Math.sin(dancePhase * 7);
-      const la =  0.15 - Math.max(0,  beat) * 2.45;
-      const ra = -0.15 + Math.max(0, -beat) * 2.45;
-      ctx.save(); ctx.translate(x+6,  ay+13); ctx.rotate(la); arm(); ctx.restore();
-      ctx.save(); ctx.translate(x+20, ay+13); ctx.rotate(ra); arm(); ctx.restore();
+      // One arm pumps up, other cocks outward dismissively
+      const dt = dancePhase * 7;
+      const beat = Math.sin(dt);
+      const sx = Math.round(Math.sin(dt * 0.5) * 2);
+      const la = beat > 0 ?  0.15 - beat * 2.45 :  0.15 + Math.abs(beat) * 0.3;
+      const ra = beat < 0 ? -0.15 + Math.abs(beat) * 2.45 : -0.15 - beat * 0.3;
+      ctx.save(); ctx.translate(x+6+sx,  ay+13); ctx.rotate(la); arm(); ctx.restore();
+      ctx.save(); ctx.translate(x+20+sx, ay+13); ctx.rotate(ra); arm(); ctx.restore();
     } else if (falling) {
       // \o/ — arms spread wide and up
       ctx.save(); ctx.translate(x+6,  ay+12); ctx.rotate(-2.4); arm(); ctx.restore();
