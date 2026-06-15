@@ -238,7 +238,7 @@ class SpriteLoader {
 
 const sprites = new SpriteLoader();
 
-const CHAR_TYPES = ['c1','c2','c3','c4','c5'];
+const CHAR_TYPES = ['c1','c2','c3','c4'];
 
 class SoundManager {
   constructor() { this._ctx = null; this._bufs = {}; }
@@ -247,13 +247,27 @@ class SoundManager {
     try { this._ctx = new (window.AudioContext || window.webkitAudioContext)(); }
     catch(e) { return; }
     const sounds = ['jump_1','jump_2','jump_3','death_sharp','death_electric','death_fall','death_blackhole','death_blunt','dance'];
-    await Promise.all(CHAR_TYPES.flatMap(c => sounds.map(s =>
-      fetch(`sounds/${c}/${s}.wav`)
+    await Promise.all([
+      ...CHAR_TYPES.flatMap(c => sounds.map(s =>
+        fetch(`sounds/${c}/${s}.wav`)
+          .then(r => r.ok ? r.arrayBuffer() : null)
+          .then(ab => ab ? this._ctx.decodeAudioData(ab) : null)
+          .then(buf => { if (buf) this._bufs[`${c}/${s}`] = buf; })
+          .catch(()=>{})
+      )),
+      fetch('sounds/zeused.wav')
         .then(r => r.ok ? r.arrayBuffer() : null)
         .then(ab => ab ? this._ctx.decodeAudioData(ab) : null)
-        .then(buf => { if (buf) this._bufs[`${c}/${s}`] = buf; })
-        .catch(()=>{})
-    )));
+        .then(buf => { if (buf) this._bufs['zeused'] = buf; })
+        .catch(()=>{}),
+      ...['bounce','cannon','electricity_on','flip_spike','countdown'].map(s =>
+        fetch(`sounds/objects/${s}.wav`)
+          .then(r => r.ok ? r.arrayBuffer() : null)
+          .then(ab => ab ? this._ctx.decodeAudioData(ab) : null)
+          .then(buf => { if (buf) this._bufs[`objects/${s}`] = buf; })
+          .catch(()=>{})
+      )
+    ]);
   }
 
   play(charType, sound, volume = 1) {
@@ -278,7 +292,30 @@ class SoundManager {
 
   playDeath(charType, cause, volume = 1) {
     const MAP = { spike:'death_sharp', shock:'death_electric', fall:'death_fall', black_hole:'death_blackhole', projectile:'death_blunt' };
+    if (cause === 'shock' && Math.random() < 0.2 && this._bufs['zeused']) {
+      this._playBuf(this._bufs['zeused'], volume);
+      return;
+    }
     this.play(charType, MAP[cause] || 'death_fall', volume);
+  }
+
+  _playBuf(buf, volume = 1) {
+    if (!this._ctx) return;
+    if (this._ctx.state === 'suspended') this._ctx.resume();
+    const src = this._ctx.createBufferSource();
+    src.buffer = buf;
+    const gain = this._ctx.createGain();
+    gain.gain.value = Math.max(0, Math.min(1, volume));
+    src.connect(gain);
+    gain.connect(this._ctx.destination);
+    src.start(0);
+  }
+
+  playObject(sound, ox, oy, lpx, lpy) {
+    const dx = ox - lpx, dy = oy - lpy;
+    const vol = Math.max(0, 1 - Math.sqrt(dx*dx + dy*dy) / 600);
+    if (vol <= 0) return;
+    this._playBuf(this._bufs[`objects/${sound}`], vol);
   }
 }
 const sfx = new SoundManager();
@@ -375,11 +412,15 @@ class GO {
       this.x = nx; this.y = ny;
     }
     if (this.type === 'shock_platform') {
+      const wasShocked = this.shocked;
       this.shocked = (t % SHOCK_PERIOD) > (SHOCK_PERIOD - SHOCK_ACTIVE);
+      if (!wasShocked && this.shocked) this._sfxEvent = 'electricity_on';
     }
     if (this.type === 'flip_platform') {
+      const wasFlipped = this._flipped;
       const phase = t % (FLIP_SAFE + FLIP_DANGER);
       this._flipped = phase >= FLIP_SAFE;
+      if (!wasFlipped && this._flipped) this._sfxEvent = 'flip_spike';
       this._flipWarning = !this._flipped && phase >= FLIP_SAFE - FLIP_WARN;
       if (this._flipped) { this._flipAngle = Math.PI; }
       else if (this._flipWarning) { this._flipAngle = ((phase-(FLIP_SAFE-FLIP_WARN))/FLIP_WARN)*Math.PI; }
@@ -393,7 +434,9 @@ class GO {
         ? Math.round(Math.sin(elapsed * 55) * (elapsed / VANISH_DELAY) * 3) : 0;
     }
     if (this.type === 'cannon') {
+      const prevPhase = this._firePhase;
       this._firePhase = t - Math.floor(t / CANNON_PERIOD) * CANNON_PERIOD;
+      if (prevPhase !== undefined && prevPhase > this._firePhase) this._sfxEvent = 'cannon_fire';
     }
     if (this.type === 'black_hole') { this._spinAngle = t * 1.5; }
     if (this.type === 'conveyor')   { this._scrollT = (t * CONVEYOR_SPEED * 2) % 18; }
@@ -857,8 +900,10 @@ class Player {
 
     // Springs
     for (const s of springs) {
-      if (this.vy>0 && overlap(this.x,this.y,PW,PH, s.x,s.y,s.w,s.h))
+      if (this.vy>0 && overlap(this.x,this.y,PW,PH, s.x,s.y,s.w,s.h)) {
         this.vy=SPRING_VEL;
+        sfx.playObject('bounce', s.x + s.w/2, s.y + s.h/2, this.x + PW/2, this.y + PH/2);
+      }
     }
 
     if (this.onGround && Math.abs(this.vx)>0.4) this.walk+=0.28;
@@ -2184,6 +2229,7 @@ class Game {
       });
     }
     if (phase==='countdown') {
+      sfx._playBuf(sfx._bufs['objects/countdown'], 1);
       this._spawnPlayers();
       Object.values(this.players).forEach(p=>{
         p.state='alive'; p.placementsLeft=0; p.ghostMode=false;
@@ -2298,6 +2344,17 @@ class Game {
 
     this._phaseTime += 1/60;
     this.level.update(this._phaseTime);
+
+    const _sfxLp = this.localPlayer;
+    if (_sfxLp) {
+      const _lpCx = _sfxLp.x + PW/2, _lpCy = _sfxLp.y + PH/2;
+      for (const obj of this.level.objects) {
+        if (obj._sfxEvent) {
+          sfx.playObject(obj._sfxEvent, obj.x + obj.w/2, obj.y + obj.h/2, _lpCx, _lpCy);
+          obj._sfxEvent = null;
+        }
+      }
+    }
 
     // Phase timer — not used in waiting room
     if (this.phase !== 'waiting') {
