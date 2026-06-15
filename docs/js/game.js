@@ -803,6 +803,8 @@ class Player {
     }
 
     if (this.onGround && Math.abs(this.vx)>0.4) this.walk+=0.28;
+    const onSlideSurface = riding?.type === 'ice' || riding?.type === 'conveyor';
+    this._slideIdle = onSlideSurface && !goLeft && !goRight;
     this._riding = riding;
 
     // Black hole pull
@@ -917,6 +919,7 @@ class Player {
     const _anim = this.ghostMode          ? 'ghost'
       : this.state === 'finished'         ? 'finished'
       : !this.onGround                    ? (this.vy < 0 ? 'jump' : 'fall')
+      : this._slideIdle                   ? 'idle'
       : Math.abs(this.vx) > 0.5          ? 'walk' : 'idle';
 
     if (!sprites.draw(ctx, `player_${this.team}`, _anim, x, y, PW, PH, this.facing < 0)) {
@@ -952,7 +955,7 @@ class Player {
 
   // Full animated character body
   _drawBody(ctx, x, y, tc) {
-    const sw      = Math.sin(this.walk);
+    const sw      = this._slideIdle ? 0 : Math.sin(this.walk);
     const inAir   = !this.onGround;
     const falling = inAir && this.vy > 2;
     const hoverY  = this.ghostMode ? Math.round(Math.sin(Date.now() / 420) * 3) : 0;
@@ -988,9 +991,9 @@ class Player {
       ctx.save(); ctx.translate(x+10, ay+27); ctx.rotate( la); leg(); ctx.restore();
       ctx.save(); ctx.translate(x+16, ay+27); ctx.rotate(-la); leg(); ctx.restore();
     } else {
-      const llX = falling ? x+3 : x+5;
-      const lrX = falling ? x+17 : x+15;
-      const legH = falling ? 11 : 13;
+      const llX = x+5;
+      const lrX = x+15;
+      const legH = 13;
       ctx.fillStyle = 'rgba(255,255,255,0.4)';
       ctx.fillRect(llX-1, ay+26, 8, legH+2);
       ctx.fillRect(lrX-1, ay+26, 8, legH+2);
@@ -1034,8 +1037,8 @@ class Player {
       ctx.save(); ctx.translate(x+20+sx, ay+13); ctx.rotate(ra); arm(); ctx.restore();
     } else if (falling) {
       // \o/ — arms spread wide and up
-      ctx.save(); ctx.translate(x+6,  ay+12); ctx.rotate(-2.4); arm(); ctx.restore();
-      ctx.save(); ctx.translate(x+20, ay+12); ctx.rotate( 2.4); arm(); ctx.restore();
+      ctx.save(); ctx.translate(x+6,  ay+12); ctx.rotate( 3); arm(); ctx.restore();
+      ctx.save(); ctx.translate(x+20, ay+12); ctx.rotate(-3); arm(); ctx.restore();
     } else if (!inAir && Math.abs(this.vx) > 0.4) {
       // Walking: single center arm swings across the torso
       ctx.save(); ctx.translate(x+13, ay+13); ctx.rotate(sw * 0.5); arm(); ctx.restore();
