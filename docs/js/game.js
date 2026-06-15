@@ -19,6 +19,11 @@ const PW = 26, PH = 40;
 const SNAP = 16;
 const DEATH_Y = WORLD_H + 80;
 
+const SCISSORS_GRACE    = 1.5;   // seconds of spawn immunity
+const SCISSORS_THROW_VX = 13;
+const SCISSORS_THROW_VY = -3;
+const SCISSORS_GRAVITY  = 0.4;
+
 const BUILD_TIME       = 60;
 const COUNTDOWN_TIME   = 3;
 const PLAY_TIME        = 120;
@@ -145,10 +150,73 @@ const UNFAVOURABLE_WINDS_LEVEL = [
   { id:'uw_s8', type:'sawblade', x:2645, y:578, w:44, h:44, permanent:true },
 ];
 
+const JSON_LEVEL = [
+  // Start / end
+  { id:'jl_start', type:'platform',   x:32,   y:730, w:256, h:30, permanent:true },
+  { id:'jl_sz',    type:'start_zone', x:58,   y:700, w:190, h:30 },
+  { id:'jl_end',   type:'platform',   x:2892, y:690, w:256, h:30, permanent:true },
+  { id:'jl_ez',    type:'end_zone',   x:2920, y:660, w:190, h:30 },
+
+  // [ opening bracket (spine on left, caps extend right)
+  { id:'jl_lb_spine', type:'platform', x:280, y:200, w:15,  h:490, permanent:true },
+  { id:'jl_lb_top',   type:'platform', x:280, y:200, w:180, h:20,  permanent:true },
+  { id:'jl_lb_bot',   type:'platform', x:280, y:670, w:180, h:20,  permanent:true },
+  { id:'jl_lb_step',  type:'platform', x:370, y:480, w:90,  h:20,  permanent:true },
+
+  // { opening curly brace (spine on right, tongue extends left)
+  { id:'jl_cb_top',   type:'platform', x:640, y:220, w:100, h:20,  permanent:true },
+  { id:'jl_cb_ts',    type:'platform', x:640, y:240, w:15,  h:120, permanent:true },
+  { id:'jl_cb_mid',   type:'platform', x:510, y:350, w:145, h:20,  permanent:true },
+  { id:'jl_cb_bs',    type:'platform', x:640, y:370, w:15,  h:120, permanent:true },
+  { id:'jl_cb_bot',   type:'platform', x:640, y:490, w:100, h:20,  permanent:true },
+
+  // : colon — two square pads
+  { id:'jl_col1',     type:'platform', x:810, y:290, w:50,  h:50,  permanent:true },
+  { id:'jl_col2',     type:'platform', x:810, y:430, w:50,  h:50,  permanent:true },
+
+  // Racing conveyors — ascend left-to-right (push right = tailwind)
+  { id:'jl_cv1', type:'conveyor', x:950,  y:620, w:130, h:20, rotation:0,   permanent:true },
+  { id:'jl_cv2', type:'conveyor', x:1160, y:500, w:130, h:20, rotation:0,   permanent:true },
+  { id:'jl_cv3', type:'conveyor', x:1370, y:380, w:130, h:20, rotation:0,   permanent:true },
+  { id:'jl_cv4', type:'conveyor', x:1540, y:260, w:130, h:20, rotation:0,   permanent:true },
+  // Descend right-to-left (push left = headwind — fight to advance)
+  { id:'jl_cv5', type:'conveyor', x:1720, y:380, w:130, h:20, rotation:180, permanent:true },
+  { id:'jl_cv6', type:'conveyor', x:1910, y:500, w:130, h:20, rotation:180, permanent:true },
+  { id:'jl_cv7', type:'conveyor', x:2100, y:620, w:130, h:20, rotation:180, permanent:true },
+
+  // Sawblades in the gap between each conveyor pair
+  { id:'jl_s1', type:'sawblade', x:1075, y:455, w:44, h:44, permanent:true },
+  { id:'jl_s2', type:'sawblade', x:1455, y:335, w:44, h:44, permanent:true },
+  { id:'jl_s3', type:'sawblade', x:1640, y:315, w:44, h:44, permanent:true },
+  { id:'jl_s4', type:'sawblade', x:1825, y:455, w:44, h:44, permanent:true },
+  { id:'jl_s5', type:'sawblade', x:2010, y:560, w:44, h:44, permanent:true },
+
+  // Bridge from cv7 to } brace
+  { id:'jl_br1', type:'platform', x:2240, y:490, w:60, h:20, permanent:true },
+
+  // } closing curly brace (spine on left, tongue extends right — mirror of {)
+  { id:'jl_cbr_top',  type:'platform', x:2220, y:220, w:100, h:20,  permanent:true },
+  { id:'jl_cbr_ts',   type:'platform', x:2305, y:240, w:15,  h:120, permanent:true },
+  { id:'jl_cbr_mid',  type:'platform', x:2305, y:350, w:145, h:20,  permanent:true },
+  { id:'jl_cbr_bs',   type:'platform', x:2305, y:370, w:15,  h:120, permanent:true },
+  { id:'jl_cbr_bot',  type:'platform', x:2220, y:490, w:100, h:20,  permanent:true },
+
+  // Bridge from } to ] bracket
+  { id:'jl_br2', type:'platform', x:2450, y:340, w:80, h:20, permanent:true },
+
+  // ] closing bracket (spine on right, caps extend left — mirror of [)
+  { id:'jl_rb_spine', type:'platform', x:2685, y:200, w:15,  h:490, permanent:true },
+  { id:'jl_rb_top',   type:'platform', x:2520, y:200, w:180, h:20,  permanent:true },
+  { id:'jl_rb_bot',   type:'platform', x:2520, y:670, w:180, h:20,  permanent:true },
+  { id:'jl_rb_step',  type:'platform', x:2520, y:480, w:90,  h:20,  permanent:true },
+];
+
 const LEVELS = {
   default:             { name:'Default',             objects: BASE_LEVEL },
   clean_slate:         { name:'Clean Slate',         objects: CLEAN_SLATE_LEVEL },
   unfavourable_winds:  { name:'Unfavourable Winds',  objects: UNFAVOURABLE_WINDS_LEVEL },
+  json:                { name:'JSON',                objects: JSON_LEVEL },
+  scissors:            { name:'Running with Scissors', objects: BASE_LEVEL, scissors:true },
 };
 
 // ─────────────────────────────────────────────
@@ -235,6 +303,7 @@ const SPRITE_MANIFEST = {
   cannon:           { src:'sprites/cannon.svg',     fw:32,  fh:32, anims:{ idle:{row:0,frames:1,fps:1} } },
   black_hole:       { src:'sprites/black_hole.svg', fw:40,  fh:40, anims:{ spin:{row:0,frames:1,fps:1} } },
   sawblade:         { src:'sprites/sawblade.svg',   fw:40,  fh:40, anims:{ idle:{row:0,frames:1,fps:1} } },
+  scissors:         { src:'sprites/scissors.svg',  fw:40,  fh:40, anims:{ idle:{row:0,frames:1,fps:1} } },
   start_zone:       { src:'sprites/start_zone.svg', fw:190, fh:30, anims:{ idle:{row:0,frames:1,fps:1} } },
   end_zone:         { src:'sprites/end_zone.svg',   fw:190, fh:30, anims:{ idle:{row:0,frames:1,fps:1} } },
 };
@@ -380,6 +449,57 @@ class SoundManager {
 const sfx = new SoundManager();
 
 // ─────────────────────────────────────────────
+//  MUSIC MANAGER
+// ─────────────────────────────────────────────
+class MusicManager {
+  constructor() {
+    this._audio   = null;
+    this._current = null;
+    this._vol     = 0.55;
+    this._level_tracks = [
+      'sounds/music/level1.mp3',
+      'sounds/music/level2.mp3',
+      'sounds/music/level3.mp3',
+      'sounds/music/level4.mp3',
+      'sounds/music/level5.mp3',
+    ];
+    this._menuTrack = 'sounds/music/menu.mp3';
+    this._lastLevelTrack = null;
+    const saved = localStorage.getItem('musicVol');
+    if (saved !== null) this._vol = Math.max(0, Math.min(1, parseFloat(saved)));
+  }
+
+  setVolume(v) {
+    this._vol = Math.max(0, Math.min(1, v));
+    localStorage.setItem('musicVol', this._vol);
+    if (this._audio) this._audio.volume = this._vol;
+  }
+
+  _play(src) {
+    if (this._current === src) return;
+    this._current = src;
+    if (this._audio) { this._audio.pause(); this._audio = null; }
+    const a = new Audio(src);
+    a.loop   = true;
+    a.volume = this._vol;
+    a.play().catch(() => {});
+    this._audio = a;
+  }
+
+  playMenu()  { this._play(this._menuTrack); }
+
+  playLevel() {
+    const pool = this._level_tracks.length > 1
+      ? this._level_tracks.filter(t => t !== this._lastLevelTrack)
+      : this._level_tracks;
+    const track = pool[Math.floor(Math.random() * pool.length)];
+    this._lastLevelTrack = track;
+    this._play(track);
+  }
+}
+const music = new MusicManager();
+
+// ─────────────────────────────────────────────
 class Input {
   constructor(canvas) {
     this.k   = {};
@@ -416,7 +536,8 @@ class Input {
   get down()    { return !!(this.k.ArrowDown  || this.k.KeyS); }
   get jumpHeld()    { return !!(this.k.Space || this.k.ArrowUp || this.k.KeyW); }
   get jumpPressed() { return this._jp.has('Space') || this._jp.has('ArrowUp') || this._jp.has('KeyW'); }
-  get dance()       { return !!(this.k.KeyZ); }
+  get dance()        { return !!(this.k.KeyZ); }
+  get throwPressed() { return this._jp.has('KeyF'); }
   pressed(code) { return this._jp.has(code); }
 }
 
@@ -887,6 +1008,8 @@ class Player {
     this._danceT=0;   // > 0 while holding Z or finished
     this.charType='c1';
     this._justJumped=false;
+    this.hasScissors    = false;
+    this._scissorsGrace = 0;
     // Dead reckoning for remote players
     this._remX=0; this._remY=0; this._remVX=0; this._remVY=0; this._remAge=0;
   }
@@ -1059,6 +1182,7 @@ class Player {
     this.walk=d.walk; this.ghostMode=d.ghostMode;
     if (d.danceT !== undefined) this._danceT = d.danceT;
     if (d.charType) this.charType = d.charType;
+    if (d.hasScissors !== undefined) this.hasScissors = d.hasScissors;
   }
 
   updateRemote(solids=[]) {
@@ -1087,7 +1211,8 @@ class Player {
     return { x:this.x, y:this.y, vx:this.vx, vy:this.vy,
              facing:this.facing, onGround:this.onGround,
              state:this.state, walk:this.walk, ghostMode:this.ghostMode,
-             danceT:this._danceT, charType:this.charType };
+             danceT:this._danceT, charType:this.charType,
+         hasScissors:this.hasScissors };
   }
 
   draw(ctx, isLocal, asGhost=false) {
@@ -1113,6 +1238,22 @@ class Player {
         this._drawDeathAnim(ctx, x, y, tc);
       } else {
         this._drawBody(ctx, x, y, tc);
+      }
+    }
+
+    // Held scissors (drawn while alive, before alpha reset so ghosts dim them too)
+    if (this.hasScissors && !inDeathSeq && !this.ghostMode) {
+      const _sImg = sprites._imgs['scissors'];
+      if (_sImg && _sImg.complete && _sImg.naturalWidth) {
+        const sw = 20, sh = 20;
+        ctx.save();
+        ctx.translate(
+          (this.facing > 0 ? x + PW + 3 : x - 3 - sw) + sw/2,
+          y + PH/2
+        );
+        if (this.facing < 0) ctx.scale(-1, 1);
+        ctx.drawImage(_sImg, -sw/2, -sh/2, sw, sh);
+        ctx.restore();
       }
     }
 
@@ -1777,6 +1918,8 @@ class Game {
     this._acc         = 0;
     this._phaseTime   = 0; // seconds since phase start — drives deterministic dynamic objects
     this._loopStarted = false;
+    this._scissorsProjectiles = [];
+    this._projCounter = 0;
 
     sprites.load(SPRITE_MANIFEST);
 
@@ -2086,10 +2229,22 @@ class Game {
     document.getElementById('start-btn').addEventListener('click', ()=>{
       if (this.isHost && (this.phase==='lobby'||this.phase==='waiting')) this._hostStartBuild();
     });
+
+    const _volSlider  = document.getElementById('music-vol');
+    const _volDisplay = document.getElementById('music-vol-display');
+    if (_volSlider) {
+      _volSlider.value = Math.round(music._vol * 100);
+      if (_volDisplay) _volDisplay.textContent = `${_volSlider.value}%`;
+      _volSlider.addEventListener('input', () => {
+        music.setVolume(_volSlider.value / 100);
+        if (_volDisplay) _volDisplay.textContent = `${_volSlider.value}%`;
+      });
+    }
   }
 
   async _join(url, roomId, name, team) {
     sfx.load();
+    music.playMenu();
     const btn=document.getElementById('join-btn');
     btn.disabled=true; btn.textContent='Connecting…';
     this.localId=uid();
@@ -2200,9 +2355,17 @@ class Game {
           p._deathProjFloorY = this.level.floorBelow(projLandX, p._deathY);
         } else { p._deathProjFloorY = null; }
         p.state='dead'; p.ghostMode=true; p._deathT=0;
+        p.hasScissors = false;
         if (this.phase==='play') this._deathOrder.push(msg.playerId);
       }
       if (msg.event==='finished') { p.state='finished'; p.ghostMode=false; }
+    });
+
+    net.on('scissors_throw', msg=>{
+      this._scissorsProjectiles.push({
+        id:msg.id, ownerId:msg.ownerId,
+        x:msg.x, y:msg.y, vx:msg.vx, vy:msg.vy, angle:0
+      });
     });
 
     net.on('player_left', msg=>{
@@ -2297,10 +2460,11 @@ class Game {
   _applyPhase(phase, timer) {
     this.phase=phase; this.timer=timer; this._phaseTime=0;
 
-    if (phase==='waiting') { this._enterWaiting(); return; }
+    if (phase==='waiting') { music.playMenu(); this._enterWaiting(); return; }
 
     if (phase==='build') {
-      if (this.round===1) this.level.reset(this._levelId || 'default');
+      this._scissorsProjectiles = [];
+      if (this.round===1) { this.level.reset(this._levelId || 'default'); music.playLevel(); }
       this._enterGame();
       this._spawnPlayers();
       const n = Object.keys(this.players).length;
@@ -2323,8 +2487,10 @@ class Game {
       this.placement.close();
     }
     if (phase==='play') {
+      const _isScissors = !!LEVELS[this._levelId]?.scissors;
       Object.values(this.players).forEach(p=>{
         p.state='alive'; p.ghostMode=false;
+        if (_isScissors) { p.hasScissors=true; p._scissorsGrace=SCISSORS_GRACE; }
       });
     }
     if (phase==='results') {
@@ -2333,6 +2499,7 @@ class Game {
     }
     if (phase==='gameover') {
       this.placement.close();
+      music.playMenu();
     }
   }
 
@@ -2465,6 +2632,19 @@ class Game {
     if (this.phase==='results')   { this._updateHUD(); this._updateResultsPanel(); this._updateFinishModal(); this._updateForceEndBtn(); return; }
     if (this.phase==='gameover')  { this._updateHUD(); this._updateResultsPanel(); this._updateFinishModal(); this._updateForceEndBtn(); return; }
 
+    const _scissorsLevel = !!LEVELS[this._levelId]?.scissors;
+    if (_scissorsLevel && this.phase === 'play') {
+      for (const p of Object.values(this.players)) {
+        if (p._scissorsGrace > 0) p._scissorsGrace = Math.max(0, p._scissorsGrace - 1/60);
+      }
+      this._scissorsProjectiles = this._scissorsProjectiles.filter(proj => {
+        proj.vy += SCISSORS_GRAVITY;
+        proj.x  += proj.vx; proj.y += proj.vy;
+        proj.angle += 0.25;
+        return proj.x > -50 && proj.x < WORLD_W + 50 && proj.y < DEATH_Y;
+      });
+    }
+
     const lp=this.localPlayer;
     if (lp) {
       // Waiting room: respawn once death/appreciation sequence finishes
@@ -2486,6 +2666,30 @@ class Game {
           lp._justJumped = false;
         }
 
+        // Scissors throw (F key)
+        if (_scissorsLevel && lp.hasScissors && lp.state==='alive' && this.input.throwPressed) {
+          lp.hasScissors = false;
+          this._projCounter++;
+          const _tp = {
+            id:`${this.localId}_${this._projCounter}`,
+            ownerId:this.localId,
+            x:lp.x+PW/2, y:lp.y+PH/2,
+            vx:lp.facing*SCISSORS_THROW_VX, vy:SCISSORS_THROW_VY,
+            angle:0
+          };
+          this._scissorsProjectiles.push(_tp);
+          this.net.broadcast({ type:'scissors_throw', ..._tp });
+        }
+
+        // Contact kill: check before collision resolution pushes players apart
+        let _contactScissorsKill = false;
+        if (_scissorsLevel && lp.state==='alive' && lp._scissorsGrace<=0) {
+          for (const op of Object.values(this.players)) {
+            if (op.id===this.localId||op.state!=='alive'||!op.hasScissors||op._scissorsGrace>0) continue;
+            if (overlap(lp.x,lp.y,PW,PH, op.x,op.y,PW,PH)) { _contactScissorsKill=true; break; }
+          }
+        }
+
         this._resolvePlayerCollisions();
 
         // Trigger disappearing platform on first contact
@@ -2501,8 +2705,15 @@ class Game {
         const diedByPhysics = evt && evt.startsWith('died') && lp.state==='alive';
         const diedByProjectile = lp.state==='alive' && this.level.projectilesAt(this._phaseTime)
             .some(p=>circleRect(p.x,p.y,p.r, lp.x,lp.y,PW,PH));
-        const _died = diedByPhysics || diedByProjectile;
-        const deathCause = diedByProjectile ? 'projectile'
+        const diedByThrownScissors = _scissorsLevel && lp.state==='alive' && lp._scissorsGrace<=0
+          && this._scissorsProjectiles.some(proj=>{
+            if (proj.ownerId===this.localId) return false;
+            const dx=(lp.x+PW/2)-proj.x, dy=(lp.y+PH/2)-proj.y;
+            return dx*dx+dy*dy < (PW/2+8)*(PW/2+8);
+          });
+        const _died = diedByPhysics || diedByProjectile || _contactScissorsKill || diedByThrownScissors;
+        const deathCause = (_contactScissorsKill||diedByThrownScissors) ? 'spike'
+          : diedByProjectile ? 'projectile'
           : (evt && evt.startsWith('died:') ? evt.slice(5) : 'fall');
 
         if (_died) {
@@ -2531,6 +2742,7 @@ class Game {
               lp._deathProjFloorY = this.level.floorBelow(projLandX, lp._deathY);
             } else { lp._deathProjFloorY = null; }
             lp.state='dead'; lp.ghostMode=true; lp._deathT=0;
+            lp.hasScissors = false;
             sfx.playDeath(lp.charType, deathCause);
             this.net.broadcast({ type:'player_event', playerId:this.localId, event:'died', cause:deathCause });
             this._deathOrder.push(this.localId);
@@ -2680,6 +2892,20 @@ class Game {
       ctx.fillStyle='#e74c3c';
       for (const p of this.level.projectilesAt(this._phaseTime)) {
         ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI*2); ctx.fill();
+      }
+    }
+
+    // Draw thrown scissors
+    if (this.phase==='play' && LEVELS[this._levelId]?.scissors) {
+      const _sImg = sprites._imgs['scissors'];
+      if (_sImg && _sImg.complete) {
+        for (const proj of this._scissorsProjectiles) {
+          ctx.save();
+          ctx.translate(proj.x, proj.y);
+          ctx.rotate(proj.angle);
+          ctx.drawImage(_sImg, -10, -10, 20, 20);
+          ctx.restore();
+        }
       }
     }
 

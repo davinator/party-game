@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" width="40" height="40">
+  <!-- Upper blade -->
+  <path d="M10,22 L34,10" stroke="#c0c0c0" stroke-width="3.5" stroke-linecap="round"/>
+  <!-- Lower blade -->
+  <path d="M10,22 L34,32" stroke="#c0c0c0" stroke-width="3.5" stroke-linecap="round"/>
+  <!-- Blade edges (sharper line) -->
+  <path d="M18,18.5 L34,10" stroke="#e8e8e8" stroke-width="1" stroke-linecap="round"/>
+  <path d="M18,25.5 L34,32" stroke="#e8e8e8" stroke-width="1" stroke-linecap="round"/>
+  <!-- Pivot screw -->
+  <circle cx="18" cy="22" r="3.5" fill="#777" stroke="#555" stroke-width="1"/>
+  <circle cx="18" cy="22" r="1.2" fill="#444"/>
+  <!-- Upper handle ring -->
+  <ellipse cx="8" cy="18" rx="6.5" ry="5" fill="none" stroke="#999" stroke-width="2.2" transform="rotate(-25 8 18)"/>
+  <!-- Lower handle ring -->
+  <ellipse cx="8" cy="27" rx="6.5" ry="5" fill="none" stroke="#999" stroke-width="2.2" transform="rotate(25 8 27)"/>
+</svg>
