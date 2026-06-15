@@ -470,12 +470,10 @@ def gen_flip_spikes():
       <stop offset="100%" stop-color="#c0392b"/>
     </linearGradient>
   </defs>
-  <rect x="0" y="0" width="{W}" height="{H}" fill="#7a1a10"/>
   {top_spikes}
   {bot_spikes}
   <rect x="0" y="10" width="{W}" height="10" fill="url(#bar)"/>
   <line x1="0" y1="11" x2="{W}" y2="11" stroke="rgba(255,255,255,0.20)" stroke-width="1"/>
-  <rect x="0" y="0" width="{W}" height="{H}" fill="none" stroke="#7a1a10" stroke-width="1"/>
 </svg>'''
 
 
@@ -762,52 +760,58 @@ def gen_black_hole():
 # ── 13. START ZONE ────────────────────────────────────────────────────────────
 def gen_start_zone():
     W, H = 190, 30
-    SQ = 15  # checkerboard square size
-    GREEN = '#2ecc71'
-    BLUE  = '#3498db'
-
+    B = 2
+    SQ = 5
     squares = []
-    for row in range(H // SQ + 1):
-        for col in range(W // SQ + 1):
-            rx = col * SQ
-            ry = row * SQ
-            rw = min(SQ, W - rx)
-            rh = min(SQ, H - ry)
-            if rw > 0 and rh > 0:
-                color = GREEN if (row + col) % 2 == 0 else BLUE
-                squares.append(
-                    f'<rect x="{rx}" y="{ry}" width="{rw}" height="{rh}" fill="{color}"/>'
-                )
-
+    for row in range((H - 2*B) // SQ + 1):
+        for col in range((W - 2*B) // SQ + 1):
+            if (row + col) % 2 == 0:
+                rx = B + col * SQ; ry = B + row * SQ
+                rw = min(SQ, W - B - rx); rh = min(SQ, H - B - ry)
+                if rw > 0 and rh > 0:
+                    squares.append(f'<rect x="{rx}" y="{ry}" width="{rw}" height="{rh}" fill="rgba(160,255,190,0.50)"/>')
     return f'''<svg xmlns="http://www.w3.org/2000/svg"
-     viewBox="0 0 {W} {H}" width="{W}" height="{H}" opacity="0.55">
+     viewBox="0 0 {W} {H}" width="{W}" height="{H}">
+  <defs>
+    <linearGradient id="sg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%"   stop-color="#48c868"/>
+      <stop offset="100%" stop-color="#28a048"/>
+    </linearGradient>
+  </defs>
+  <rect x="0" y="0" width="{W}" height="{H}" fill="#1a6030"/>
+  <rect x="{B}" y="{B}" width="{W-2*B}" height="{H-2*B}" fill="url(#sg)"/>
   {''.join(squares)}
+  <line x1="{B}" y1="{B+1}" x2="{W-B}" y2="{B+1}" stroke="rgba(255,255,255,0.40)" stroke-width="1"/>
+  <rect x="1" y="1" width="{W-2}" height="{H-2}" fill="none" stroke="#1a6030" stroke-width="2"/>
 </svg>'''
 
 
 # ── 14. END ZONE ──────────────────────────────────────────────────────────────
 def gen_end_zone():
     W, H = 190, 30
-    SQ = 15  # checkerboard square size
-    GREEN = '#2ecc71'
-    BLUE  = '#3498db'
-
+    B = 2
+    SQ = 5
     squares = []
-    for row in range(H // SQ + 1):
-        for col in range(W // SQ + 1):
-            rx = col * SQ
-            ry = row * SQ
-            rw = min(SQ, W - rx)
-            rh = min(SQ, H - ry)
-            if rw > 0 and rh > 0:
-                color = BLUE if (row + col) % 2 == 0 else GREEN
-                squares.append(
-                    f'<rect x="{rx}" y="{ry}" width="{rw}" height="{rh}" fill="{color}"/>'
-                )
-
+    for row in range((H - 2*B) // SQ + 1):
+        for col in range((W - 2*B) // SQ + 1):
+            if (row + col) % 2 == 0:
+                rx = B + col * SQ; ry = B + row * SQ
+                rw = min(SQ, W - B - rx); rh = min(SQ, H - B - ry)
+                if rw > 0 and rh > 0:
+                    squares.append(f'<rect x="{rx}" y="{ry}" width="{rw}" height="{rh}" fill="rgba(160,200,255,0.50)"/>')
     return f'''<svg xmlns="http://www.w3.org/2000/svg"
-     viewBox="0 0 {W} {H}" width="{W}" height="{H}" opacity="0.55">
+     viewBox="0 0 {W} {H}" width="{W}" height="{H}">
+  <defs>
+    <linearGradient id="eg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%"   stop-color="#4878e8"/>
+      <stop offset="100%" stop-color="#2858c0"/>
+    </linearGradient>
+  </defs>
+  <rect x="0" y="0" width="{W}" height="{H}" fill="#1a2060"/>
+  <rect x="{B}" y="{B}" width="{W-2*B}" height="{H-2*B}" fill="url(#eg)"/>
   {''.join(squares)}
+  <line x1="{B}" y1="{B+1}" x2="{W-B}" y2="{B+1}" stroke="rgba(255,255,255,0.40)" stroke-width="1"/>
+  <rect x="1" y="1" width="{W-2}" height="{H-2}" fill="none" stroke="#1a2060" stroke-width="2"/>
 </svg>'''
 
 

@@ -402,7 +402,7 @@ class GO {
     // Range track drawn before sprite so it sits behind the platform body
     if (this.type === 'moving_platform') this._dMovingPlatTrack(ctx, w, h);
     // Types with custom animated draw code bypass the sprite system
-    const CUSTOM_DRAW = new Set(['cannon','shock_platform','disappearing','flip_platform']);
+    const CUSTOM_DRAW = new Set(['cannon','shock_platform','disappearing','flip_platform','black_hole','conveyor']);
     if (!CUSTOM_DRAW.has(this.type) && sprites.draw(ctx, this.type, this._spriteAnim(), x, y, w, h)) return;
     switch(this.type) {
       case 'platform':        this._dPlat(ctx,x,y,w,h);         break;
@@ -536,18 +536,33 @@ class GO {
   _dShock(ctx, x, y, w, h) {
     sprites.draw(ctx, 'shock_platform', this.shocked ? 'shocked' : 'idle', x, y, w, h);
     if (this.shocked) {
-      const frame = Math.floor(performance.now() / 70);
-      for (let i = 0; i < 4; i++) {
-        const seed = frame * 19 + i * 41;
-        const bx = x + 8 + ((seed * 31) % Math.max(1, w - 16));
-        const bh = 5 + ((seed * 13) % 8);
-        ctx.strokeStyle = i % 2 === 0 ? '#fffde7' : '#f9a825';
-        ctx.lineWidth = 1.5;
+      const t = performance.now() / 1000;
+      // 3 horizontal electric arcs at different y positions
+      const arcYs = [y + h * 0.25, y + h * 0.5, y + h * 0.78];
+      for (let a = 0; a < arcYs.length; a++) {
+        const baseY = arcYs[a];
+        const phase = t * (14 + a * 4.7) + a * 2.1;
         ctx.beginPath();
-        ctx.moveTo(bx, y);
-        ctx.lineTo(bx + ((seed * 7) % 7) - 3, y - bh * 0.5);
-        ctx.lineTo(bx + ((seed * 11) % 6) - 3, y - bh);
+        ctx.strokeStyle = a === 1 ? 'rgba(255,255,255,0.95)' : 'rgba(255,230,60,0.80)';
+        ctx.lineWidth = a === 1 ? 1.5 : 1;
+        const step = 3;
+        for (let px = x; px <= x + w; px += step) {
+          const ny = baseY
+            + Math.sin(px * 0.28 + phase)          * 2.8
+            + Math.sin(px * 0.71 + phase * 1.6)    * 1.4
+            + Math.sin(px * 1.3  + phase * 0.8)    * 0.8;
+          if (px === x) ctx.moveTo(px, ny); else ctx.lineTo(px, ny);
+        }
         ctx.stroke();
+      }
+      // Spark dots scattered across surface
+      const frame = Math.floor(t * 18);
+      for (let i = 0; i < 6; i++) {
+        const seed = (frame * 23 + i * 53) >>> 0;
+        const sx2 = x + (seed % Math.max(1, w - 4)) + 2;
+        const sy2 = y + ((seed * 7) % h);
+        ctx.fillStyle = i % 3 === 0 ? '#ffffff' : '#ffe040';
+        ctx.beginPath(); ctx.arc(sx2, sy2, 1.2, 0, Math.PI * 2); ctx.fill();
       }
     }
   }
