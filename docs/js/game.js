@@ -70,7 +70,7 @@ const CANNON_SPEED   = 7;   // pixels per tick
 const CANNON_RANGE   = 700; // pixels before projectile despawns
 const BH_PULL_RADIUS = 280; // pixels of influence
 const BH_KILL_RADIUS = 16;  // pixels from centre = instant death (inner half of disc)
-const BH_FORCE       = 0.75;// pull acceleration per tick (scales with proximity)
+const BH_FORCE       = 1.05;// pull acceleration per tick (scales with proximity)
 
 const PALETTE = [
   '#e74c3c','#e67e22','#f1c40f','#2ecc71',
@@ -752,9 +752,12 @@ class Player {
     if (goRight) this.vx += MOVE_ACCEL;
     this.vx = clamp(this.vx, -MOVE_MAX, MOVE_MAX);
     if (!goLeft && !goRight) {
-      const onIce = this._riding?.type === 'ice';
-      this.vx *= this.onGround ? (onIce ? 0.98 : FRICTION) : AIR_FRIC;
-      if (Math.abs(this.vx)<0.08) this.vx=0;
+      const onIce      = this._riding?.type === 'ice';
+      const onConveyor = this._riding?.type === 'conveyor';
+      if (!onConveyor) {
+        this.vx *= this.onGround ? (onIce ? 0.98 : FRICTION) : AIR_FRIC;
+        if (Math.abs(this.vx)<0.08) this.vx=0;
+      }
     }
     if (this.vx>0) this.facing=1;
     if (this.vx<0) this.facing=-1;
@@ -789,10 +792,10 @@ class Player {
     this.y += this.vy;
     const riding = this._resolveY(solids);
     if (this.y < -WORLD_H) { this.y = -WORLD_H; if (this.vy < 0) this.vy = 0; }
-    // Conveyor push
+    // Conveyor: pull vx toward conveyor speed so player can fight or boost it
     if (riding?.type === 'conveyor') {
       const dir = (riding.rotation === 180) ? -1 : 1;
-      this.vx += dir * CONVEYOR_SPEED;
+      this.vx += (dir * CONVEYOR_SPEED - this.vx) * 0.25;
       this.vx = clamp(this.vx, -MOVE_MAX * 2, MOVE_MAX * 2);
     }
 
