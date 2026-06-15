@@ -52,7 +52,7 @@ const OBJ = {
   elevator:         { w: 80,  h: 30, label: 'Elevator',    key: '0',
                       defaults: { rangeY: 200 } },
   cannon:           { w: 32,  h: 32, label: 'Cannon',      key: 'q' },
-  black_hole:       { w: 40,  h: 40, label: 'Black Hole',  key: 'w' },
+  black_hole:       { w: 64,  h: 64, label: 'Black Hole',  key: 'w' },
 };
 
 const CONVEYOR_SPEED = 3.2; // px per tick pushed onto player
@@ -69,7 +69,7 @@ const CANNON_PERIOD  = 3.0; // seconds between shots
 const CANNON_SPEED   = 7;   // pixels per tick
 const CANNON_RANGE   = 700; // pixels before projectile despawns
 const BH_PULL_RADIUS = 280; // pixels of influence
-const BH_KILL_RADIUS = 6;   // pixels from centre = instant death (very center only)
+const BH_KILL_RADIUS = 16;  // pixels from centre = instant death (inner half of disc)
 const BH_FORCE       = 0.75;// pull acceleration per tick (scales with proximity)
 
 const PALETTE = [
@@ -133,7 +133,7 @@ const WAITING_LEVEL = [
   { id:'d_elv',  type:'elevator',        x:1620, y:660, w:80,  h:30, permanent:true,
     rangeY:200 },
   // Right-section hazards — explore at your own risk
-  { id:'d_bh',   type:'black_hole',      x:2100, y:640, w:40,  h:40, permanent:true },
+  { id:'d_bh',   type:'black_hole',      x:2088, y:628, w:64,  h:64, permanent:true },
   { id:'d_can',  type:'cannon',          x:3130, y:788, w:32,  h:32, permanent:true,
     rotation:180 },
 ];
