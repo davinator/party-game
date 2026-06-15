@@ -944,12 +944,12 @@ class Player {
       ctx.restore();
     } else {
       // Stopped or airborne — arms close to body, slight outward tilt
-      ctx.save(); ctx.translate(x+6, ay+13); ctx.rotate(-0.2);
+      ctx.save(); ctx.translate(x+6, ay+13); ctx.rotate(0.15);
       ctx.fillStyle='rgba(255,255,255,0.4)'; ctx.fillRect(-3,-1,7,13);
       ctx.fillStyle=tc.primary;               ctx.fillRect(-2, 0,5,11);
       ctx.fillStyle=tc.light;                 ctx.fillRect(-2, 0,5, 2);
       ctx.restore();
-      ctx.save(); ctx.translate(x+20, ay+13); ctx.rotate(0.2);
+      ctx.save(); ctx.translate(x+20, ay+13); ctx.rotate(-0.15);
       ctx.fillStyle='rgba(255,255,255,0.4)'; ctx.fillRect(-3,-1,7,13);
       ctx.fillStyle=tc.primary;               ctx.fillRect(-2, 0,5,11);
       ctx.fillStyle=tc.light;                 ctx.fillRect(-2, 0,5, 2);
