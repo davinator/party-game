@@ -876,12 +876,12 @@ class Player {
     } else if (!inAir) {
       // Pivot from hip: each leg swings forward/backward like a pendulum
       const la = sw * 0.4;
-      ctx.save(); ctx.translate(x+8, ay+27); ctx.rotate(la);
+      ctx.save(); ctx.translate(x+10, ay+27); ctx.rotate(la);
       ctx.fillStyle='rgba(255,255,255,0.4)'; ctx.fillRect(-4,-1,8,15);
       ctx.fillStyle=tc.primary;               ctx.fillRect(-3, 0,6,13);
       ctx.fillStyle=tc.light;                 ctx.fillRect(-3, 0,6, 2);
       ctx.restore();
-      ctx.save(); ctx.translate(x+18, ay+27); ctx.rotate(-la);
+      ctx.save(); ctx.translate(x+16, ay+27); ctx.rotate(-la);
       ctx.fillStyle='rgba(255,255,255,0.4)'; ctx.fillRect(-4,-1,8,15);
       ctx.fillStyle=tc.primary;               ctx.fillRect(-3, 0,6,13);
       ctx.fillStyle=tc.light;                 ctx.fillRect(-3, 0,6, 2);
@@ -904,9 +904,9 @@ class Player {
 
     // ── Torso ──
     ctx.fillStyle = tc.primary;
-    ctx.fillRect(x+7, ay+12, 12, 15);
+    ctx.fillRect(x+8, ay+12, 10, 15);
     ctx.fillStyle = tc.light;
-    ctx.fillRect(x+7, ay+12, 12, 3);
+    ctx.fillRect(x+8, ay+12, 10, 3);
 
     // ── Arms ──
     if (dancing) {
@@ -923,50 +923,47 @@ class Player {
       ctx.fillRect(x+1,  laY, 5, 2);
       ctx.fillRect(x+20, raY, 5, 2);
     } else if (falling) {
-      // Arms fly up when falling fast
-      ctx.fillStyle = 'rgba(255,255,255,0.4)';
-      ctx.fillRect(x,    ay+2, 7, 16);
-      ctx.fillRect(x+19, ay+2, 7, 16);
-      ctx.fillStyle = tc.primary;
-      ctx.fillRect(x+1,  ay+3, 5, 14);
-      ctx.fillRect(x+20, ay+3, 5, 14);
-      ctx.fillStyle = tc.light;
-      ctx.fillRect(x+1,  ay+3, 5, 2);
-      ctx.fillRect(x+20, ay+3, 5, 2);
-    } else if (!inAir) {
-      // Pivot from shoulder: arms swing in opposition to legs (natural gait)
-      const aa = sw * 0.3;
-      ctx.save(); ctx.translate(x+3, ay+13); ctx.rotate(aa);
+      // \o/ pose — arms spread wide up and outward
+      ctx.save(); ctx.translate(x+6, ay+12); ctx.rotate(-2.4);
       ctx.fillStyle='rgba(255,255,255,0.4)'; ctx.fillRect(-3,-1,7,13);
       ctx.fillStyle=tc.primary;               ctx.fillRect(-2, 0,5,11);
       ctx.fillStyle=tc.light;                 ctx.fillRect(-2, 0,5, 2);
       ctx.restore();
-      ctx.save(); ctx.translate(x+22, ay+13); ctx.rotate(-aa);
+      ctx.save(); ctx.translate(x+20, ay+12); ctx.rotate(2.4);
+      ctx.fillStyle='rgba(255,255,255,0.4)'; ctx.fillRect(-3,-1,7,13);
+      ctx.fillStyle=tc.primary;               ctx.fillRect(-2, 0,5,11);
+      ctx.fillStyle=tc.light;                 ctx.fillRect(-2, 0,5, 2);
+      ctx.restore();
+    } else if (!inAir && Math.abs(this.vx) > 0.4) {
+      // Walking: single arm in body center swings across the torso
+      const aa = sw * 0.5;
+      ctx.save(); ctx.translate(x+13, ay+13); ctx.rotate(aa);
       ctx.fillStyle='rgba(255,255,255,0.4)'; ctx.fillRect(-3,-1,7,13);
       ctx.fillStyle=tc.primary;               ctx.fillRect(-2, 0,5,11);
       ctx.fillStyle=tc.light;                 ctx.fillRect(-2, 0,5, 2);
       ctx.restore();
     } else {
-      // Airborne idle — straight arms at sides
-      ctx.fillStyle = 'rgba(255,255,255,0.4)';
-      ctx.fillRect(x,    ay+12, 7, 13);
-      ctx.fillRect(x+19, ay+12, 7, 13);
-      ctx.fillStyle = tc.primary;
-      ctx.fillRect(x+1,  ay+13, 5, 11);
-      ctx.fillRect(x+20, ay+13, 5, 11);
-      ctx.fillStyle = tc.light;
-      ctx.fillRect(x+1,  ay+13, 5, 2);
-      ctx.fillRect(x+20, ay+13, 5, 2);
+      // Stopped or airborne — arms close to body, slight outward tilt
+      ctx.save(); ctx.translate(x+6, ay+13); ctx.rotate(-0.2);
+      ctx.fillStyle='rgba(255,255,255,0.4)'; ctx.fillRect(-3,-1,7,13);
+      ctx.fillStyle=tc.primary;               ctx.fillRect(-2, 0,5,11);
+      ctx.fillStyle=tc.light;                 ctx.fillRect(-2, 0,5, 2);
+      ctx.restore();
+      ctx.save(); ctx.translate(x+20, ay+13); ctx.rotate(0.2);
+      ctx.fillStyle='rgba(255,255,255,0.4)'; ctx.fillRect(-3,-1,7,13);
+      ctx.fillStyle=tc.primary;               ctx.fillRect(-2, 0,5,11);
+      ctx.fillStyle=tc.light;                 ctx.fillRect(-2, 0,5, 2);
+      ctx.restore();
     }
 
     // ── Head ──
     ctx.fillStyle = tc.light;
-    ctx.fillRect(x+4, ay+1, 18, 11);
+    ctx.fillRect(x+6, ay+1, 14, 11);
     ctx.fillStyle = tc.primary;
-    ctx.fillRect(x+4, ay+9, 18, 3);  // neck shadow at head base
+    ctx.fillRect(x+6, ay+9, 14, 3);  // neck shadow at head base
 
     // ── Eye ──
-    const eyeX = this.facing > 0 ? x+15 : x+5;
+    const eyeX = this.facing > 0 ? x+13 : x+7;
     ctx.fillStyle = '#fff';
     ctx.fillRect(eyeX, ay+3, 5, 5);
     const pupOff = this.facing > 0 ? 2 : 0;
