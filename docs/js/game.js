@@ -22,6 +22,7 @@ const SNAP = 16;
 let DEATH_Y = WORLD_H + 80;
 
 const SCISSORS_GRACE    = 1.5;   // seconds of spawn immunity
+const SPAWN_GRACE       = 2.5;   // seconds of player-collision immunity after spawning
 const SCISSORS_THROW_VX = 13;
 const SCISSORS_THROW_VY = -3;
 const SCISSORS_GRAVITY  = 0.4;
@@ -38,7 +39,7 @@ const DEATH_FADE_DUR  = 0.5;  // seconds to fade out
 const DEATH_TOTAL     = DEATH_ANIM_DUR + DEATH_LIE_DUR + DEATH_FADE_DUR;
 
 const CAM_LERP = 0.1; // camera smoothing (lower = smoother/slower)
-const VERSION  = '0.1.36';
+const VERSION  = '1.0.1';
 
 const TEAM = {
   green: { primary: '#27ae60', light: '#2ecc71', name: 'Green Team' },
@@ -61,6 +62,7 @@ const OBJ = {
                       defaults: { rangeY: 200 } },
   cannon:           { w: 32,  h: 32, label: 'Cannon',      key: 'q' },
   black_hole:       { w: 64,  h: 64, label: 'Black Hole',  key: 'w' },
+  eraser:           { w: 32,  h: 32, label: 'Eraser',      key: 'e', meta: true },
 };
 
 const CONVEYOR_SPEED = 3.2; // px per tick pushed onto player
@@ -1031,6 +1033,7 @@ class Player {
     this.isTarget       = false;
     this._originalTeam  = team;
     this._scissorsGrace = 0;
+    this._spawnGrace    = 0;
     // Dead reckoning for remote players
     this._remX=0; this._remY=0; this._remVX=0; this._remVY=0; this._remAge=0;
   }
@@ -1039,6 +1042,7 @@ class Player {
     this.x=x; this.y=y; this.vx=0; this.vy=0;
     this.onGround=false; this.state='alive';
     this._coyote=0; this._jbuf=0; this._throwBuf=0; this.ghostMode=false;
+    this._spawnGrace = SPAWN_GRACE;
   }
 
   updateLocal(inp, level, placementActive=false, mirrorControls=true) {
@@ -1694,7 +1698,7 @@ class Placement {
   }
 
   drawGhost(ctx) {
-    if (!this.active) return;
+    if (!this.active || this.type === 'eraser') return;
     const def=this._def();
     const base=OBJ[this.type];
     const extras=base.defaults ? { ...base.defaults, baseX:this.gx, baseY:this.gy } : {};
@@ -2042,9 +2046,14 @@ class Game {
 
     document.getElementById('force-end-btn')
       .addEventListener('click', ()=>{
-        if (!this.isHost || this.phase!=='play') return;
-        this._applyPhase('results', RESULTS_TIME);
-        this.net.broadcast({ type:'phase_change', newPhase:'results', timer:RESULTS_TIME, scores:this.scores });
+        if (!this.isHost) return;
+        if (this.phase === 'build') {
+          this._applyPhase('countdown', COUNTDOWN_TIME);
+          this.net.broadcast({ type:'phase_change', newPhase:'countdown', timer:COUNTDOWN_TIME });
+        } else if (this.phase === 'play') {
+          this._applyPhase('results', RESULTS_TIME);
+          this.net.broadcast({ type:'phase_change', newPhase:'results', timer:RESULTS_TIME, scores:this.scores });
+        }
       });
 
     this.canvas.addEventListener('mousemove', e=>{
@@ -2058,9 +2067,16 @@ class Game {
       const lp=this.localPlayer; if (!lp) return;
       const w=this.screenToWorld(e.clientX, e.clientY);
       this.placement.updateMouse(w.x, w.y);
-      const obj=this.placement.build(this.localId);
-      this.level.add(obj);
-      this.net.broadcast({ type:'place_object', obj });
+      if (this.placement.type === 'eraser') {
+        const target = this._findEraserTarget();
+        if (!target) return;
+        this.level.remove(target.id);
+        this.net.broadcast({ type:'remove_object', id:target.id });
+      } else {
+        const obj=this.placement.build(this.localId);
+        this.level.add(obj);
+        this.net.broadcast({ type:'place_object', obj });
+      }
       lp.placementsLeft--;
       if (this.phase==='build' && lp.placementsLeft===0) {
         lp._buildDone=true;
@@ -2220,9 +2236,13 @@ class Game {
     const el = document.getElementById('host-force-end');
     if (!el) return;
     const lp = this.localPlayer;
-    const show = this.phase === 'play' && this.isHost &&
-                 (lp?.state === 'dead' || lp?.state === 'finished');
+    const showBuild = this.phase === 'build' && this.isHost;
+    const showPlay  = this.phase === 'play'  && this.isHost &&
+                      (lp?.state === 'dead' || lp?.state === 'finished');
+    const show = showBuild || showPlay;
     el.classList.toggle('hidden', !show);
+    const btn = document.getElementById('force-end-btn');
+    if (btn) btn.textContent = showBuild ? '⏭ End Build Phase' : '⏭ End Round Now';
   }
 
   _resize() {
@@ -2419,7 +2439,8 @@ class Game {
       if (p&&msg.from!==this.localId) p.applyRemote(msg);
     });
 
-    net.on('place_object', msg=>{ this.level.add(msg.obj); });
+    net.on('place_object',  msg=>{ this.level.add(msg.obj); });
+    net.on('remove_object', msg=>{ this.level.remove(msg.id); });
 
     net.on('build_done', msg=>{
       const p=this.players[msg.from]; if (p) p._buildDone=true;
@@ -2788,6 +2809,9 @@ class Game {
     if (this.phase==='gameover')  { this._updateHUD(); this._updateResultsPanel(); this._updateFinishModal(); this._updateForceEndBtn(); return; }
 
     const _scissorsLevel = !!LEVELS[this._levelId]?.scissors;
+    for (const p of Object.values(this.players)) {
+      if (p._spawnGrace > 0) p._spawnGrace = Math.max(0, p._spawnGrace - 1/60);
+    }
     if (_scissorsLevel && this.phase === 'play') {
       for (const p of Object.values(this.players)) {
         if (p._scissorsGrace > 0) p._scissorsGrace = Math.max(0, p._scissorsGrace - 1/60);
@@ -2844,6 +2868,7 @@ class Game {
         if (_scissorsLevel && lp.state==='alive' && lp._scissorsGrace<=0) {
           for (const op of Object.values(this.players)) {
             if (op.id===this.localId||op.state!=='alive'||op.scissorsCount===0||op._scissorsGrace>0) continue;
+            if (op.team === lp.team) continue;
             if (overlap(lp.x,lp.y,PW,PH, op.x,op.y,PW,PH)) { _contactScissorsKill=true; break; }
           }
         }
@@ -2985,9 +3010,23 @@ class Game {
     return 20;                           // off screen — 3 Hz
   }
 
+  _findEraserTarget() {
+    const mx = this.placement.cx, my = this.placement.cy;
+    const removable = this.level.objects.filter(o => !o.permanent);
+    if (!removable.length) return null;
+    let best = null, bestDist = Infinity;
+    for (const o of removable) {
+      const dx = (o.x + o.w/2) - mx, dy = (o.y + o.h/2) - my;
+      const d = dx*dx + dy*dy;
+      if (d < bestDist) { bestDist = d; best = o; }
+    }
+    return best;
+  }
+
   _resolvePlayerCollisions() {
     const lp = this.localPlayer;
     if (!lp || lp.ghostMode || lp.state !== 'alive') return;
+    if (lp._spawnGrace > 0) return;
     for (const p of Object.values(this.players)) {
       if (p.id === this.localId || p.ghostMode || p.state !== 'alive') continue;
       if (!overlap(lp.x, lp.y, PW, PH, p.x, p.y, PW, PH)) continue;
@@ -3058,7 +3097,7 @@ class Game {
     this.level.draw(ctx);
 
     // Draw cannon projectiles
-    if (this.phase==='play' || this.phase==='waiting') {
+    if (this.phase==='play' || this.phase==='waiting' || this.phase==='build' || this.phase==='countdown') {
       ctx.fillStyle='#e74c3c';
       for (const p of this.level.projectilesAt(this._phaseTime)) {
         ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI*2); ctx.fill();
@@ -3096,6 +3135,27 @@ class Game {
     }
 
     this.placement.drawGhost(ctx);
+
+    if (this.placement.active && this.placement.type === 'eraser') {
+      const target = this._findEraserTarget();
+      if (target) {
+        ctx.save();
+        ctx.strokeStyle = '#e74c3c';
+        ctx.lineWidth = 3;
+        ctx.strokeRect(target.x, target.y, target.w, target.h);
+        ctx.globalAlpha = 0.25;
+        ctx.fillStyle = '#e74c3c';
+        ctx.fillRect(target.x, target.y, target.w, target.h);
+        ctx.restore();
+      } else {
+        ctx.save();
+        ctx.strokeStyle = '#e74c3c';
+        ctx.lineWidth = 2;
+        const ex = snap(this.placement.cx - 16), ey = snap(this.placement.cy - 16);
+        ctx.strokeRect(ex, ey, 32, 32);
+        ctx.restore();
+      }
+    }
 
     ctx.restore();
 
